@@ -55,6 +55,21 @@ function confint_table(x::MixedModelBootstrap, level=0.95; show_intercept=true)
     return filter!(:coefname => in(_coefnames(x; show_intercept)), df)
 end
 
+"""
+    _extract_title!(ax::Axis, kwargs)::Base.Pairs
+
+If a title is present in kwargs, use it to set the axis title.
+
+Returns kwargs without an entry for `title`.
+"""
+function _extract_title!(ax::Axis, kwargs)::Base.Pairs
+    if :title in keys(kwargs)
+        ax.title = kwargs[:title]
+        kwargs = NamedTuple((k => v for (k, v) in kwargs if k != :title))
+    end
+    return Base.pairs(kwargs)
+end
+
 _npreds(x; show_intercept=true) = length(_coefnames(x; show_intercept))
 
 """
