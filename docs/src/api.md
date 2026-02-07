@@ -147,6 +147,8 @@ shrinkageplot!
 using CairoMakie
 using MixedModels
 using MixedModelsMakie
+# The SVG sometimes renders incorrectly
+CairoMakie.activate!(; type="png")
 sleepstudy = MixedModels.dataset(:sleepstudy)
 verbagg = MixedModels.dataset(:verbagg)
 
