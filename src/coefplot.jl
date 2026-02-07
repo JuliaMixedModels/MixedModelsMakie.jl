@@ -34,6 +34,7 @@ end
 """$(@doc coefplot)"""
 function coefplot!(fig::Indexable, x::Union{MixedModel,MixedModelBootstrap}; kwargs...)
     ax = Axis(fig[1, 1])
+    kwargs = _extract_title!(ax, kwargs)
     coefplot!(ax, x; kwargs...)
     return fig
 end
@@ -65,3 +66,12 @@ function coefplot!(ax::Axis, x::Union{MixedModel,MixedModelBootstrap};
     ylims!(ax, 0, nticks + 1)
     return ax
 end
+
+# function g(; kwargs...)
+#     if :a in keys(kwargs)
+#         a = kwargs[:a]
+#         kwargs = Base.pairs(NamedTuple((k => v for (k, v) in kwargs if k != :a)))
+#     end
+
+#     @info "" kwargs
+# end

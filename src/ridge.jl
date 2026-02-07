@@ -75,6 +75,7 @@ function ridgeplot!(ax::Axis, x::MixedModelBootstrap;
                   scatter_attributes, errorbars_attributes, attributes...)
     end
 
+    attributes = _extract_title!(ax, attributes)
     attributes = merge((; color=:black), attributes)
     band_attributes = merge((; color=(_color(attributes.color), 0.3)), band_attributes)
 
