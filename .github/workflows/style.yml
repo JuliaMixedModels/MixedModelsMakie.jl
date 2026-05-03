@@ -5,16 +5,22 @@ on:
     paths-ignore:
       - 'README.md'
       - '.gitignore'
+permissions: {}
 jobs:
   format-check:
     name: Style Enforcement
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
     strategy:
       matrix:
         julia-version: [min]
     steps:
-      - uses: actions/checkout@v6
-      - uses: julia-actions/setup-julia@latest
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+      - uses: julia-actions/setup-julia@f6f565d9f7cf12f53dc8045742460d6260ad3b39 # v3.0.1
         with:
           version: ${{ matrix.julia-version }}
       - name: Install JuliaFormatter
@@ -28,7 +34,7 @@ jobs:
           using JuliaFormatter
           format(".", YASStyle(); verbose=true) || exit(1)
       # Add formatting suggestions to non-draft PRs even if "Check formatting" fails
-      - uses: reviewdog/action-suggester@v1
+      - uses: reviewdog/action-suggester@aa38384ceb608d00f84b4690cacc83a5aba307ff # v1
         if: ${{ !cancelled() && github.event.pull_request.draft == false }}
         with:
           tool_name: JuliaFormatter
