@@ -79,16 +79,20 @@ function _upset_data(m::MixedModel, data; gf::Union{Symbol,Nothing})
         end
     end
 
-    # Cells = full factorial: one level per predictor (these become the rows)
+    # Cells = full factorial: one level per predictor (these become the rows).
+    # Also store combo_strs for later marginal grouping.
     cell_labels = String[]
     cell_set_indices = Vector{Int}[]
     cell_checks = Vector{Pair{Int,String}}[]
+    cell_combo_strs = Vector{String}[]   # cell_combo_strs[ci][j] = level string of pred j
 
     for combo in Iterators.product(pred_levels...)
-        parts = [string(pred_names[j], ": ", combo[j]) for j in eachindex(pred_names)]
+        strs = [string(combo[j]) for j in eachindex(pred_names)]
+        parts = [string(pred_names[j], ": ", strs[j]) for j in eachindex(pred_names)]
         push!(cell_labels, join(parts, " & "))
-        push!(cell_set_indices, [set_index[(j, string(combo[j]))] for j in eachindex(pred_names)])
-        push!(cell_checks, [j => string(combo[j]) for j in eachindex(pred_names)])
+        push!(cell_set_indices, [set_index[(j, strs[j])] for j in eachindex(pred_names)])
+        push!(cell_checks, [j => strs[j] for j in eachindex(pred_names)])
+        push!(cell_combo_strs, strs)
     end
     n_cells = length(cell_labels)
 
@@ -154,7 +158,76 @@ function _upset_data(m::MixedModel, data; gf::Union{Symbol,Nothing})
         end
     end
 
-    return (; gf_levels, set_labels, cell_labels, combo_matrix, cell_counts, set_counts)
+    # Full-cell degrees: all cells have n_preds singly-specified predictors
+    n_preds = length(pred_names)
+    cell_degrees = fill(n_preds, n_cells)
+
+    # Marginal cells: collapse exactly one predictor (all its levels are active).
+    # A subject is "in" this cell if it appeared in full-cell observations covering
+    # *every* level of the collapsed predictor (AND specific levels of the others).
+    # For gf=nothing: sum of component full-cell observation counts.
+    marginal_labels = String[]
+    marginal_combo_rows = Vector{Int}[]
+    marginal_counts = Int[]
+    marginal_degrees = Int[]
+
+    for collapse_pi in eachindex(pred_names)
+        other_pis = [j for j in eachindex(pred_names) if j != collapse_pi]
+        other_level_seqs = [pred_levels[j] for j in other_pis]
+
+        for other_combo in Iterators.product(other_level_seqs...)
+            other_strs = [string(other_combo[k]) for k in eachindex(other_pis)]
+
+            # Full cells belonging to this marginal group (same levels for other preds)
+            group = [ci for (ci, cv) in enumerate(cell_combo_strs)
+                     if all(cv[other_pis[k]] == other_strs[k] for k in eachindex(other_pis))]
+
+            # Label: only the fixed (non-collapsed) predictor-level pairs
+            label_parts = [string(pred_names[other_pis[k]], ": ", other_strs[k])
+                           for k in eachindex(other_pis)]
+            push!(marginal_labels, join(label_parts, " & "))
+
+            # Filled sets: ALL levels of the collapsed predictor + one level per other pred
+            filled = Int[]
+            for lv in pred_levels[collapse_pi]
+                push!(filled, set_index[(collapse_pi, string(lv))])
+            end
+            for k in eachindex(other_pis)
+                push!(filled, set_index[(other_pis[k], other_strs[k])])
+            end
+            push!(marginal_combo_rows, sort!(filled))
+
+            # Count
+            if gf !== nothing
+                m_mem = trues(length(gf_levels))
+                for ci in group
+                    m_mem .&= cell_membership[:, ci]
+                end
+                push!(marginal_counts, count(m_mem))
+            else
+                push!(marginal_counts, sum(cell_counts[ci] for ci in group; init=0))
+            end
+
+            push!(marginal_degrees, n_preds - 1)
+        end
+    end
+
+    # Combine full cells + marginal cells
+    n_marginals = length(marginal_labels)
+    marginal_combo = falses(n_marginals, n_sets)
+    for (mi, filled) in enumerate(marginal_combo_rows)
+        for si in filled
+            marginal_combo[mi, si] = true
+        end
+    end
+
+    all_labels = vcat(cell_labels, marginal_labels)
+    all_combo  = vcat(combo_matrix, marginal_combo)
+    all_counts = vcat(cell_counts, marginal_counts)
+    all_degrees = vcat(cell_degrees, marginal_degrees)
+
+    return (; gf_levels, set_labels, cell_labels=all_labels, combo_matrix=all_combo,
+            cell_counts=all_counts, cell_degrees=all_degrees, set_counts)
 end
 
 """
@@ -194,7 +267,8 @@ function upsetplot!(f::Indexable, m::MixedModel, data;
     perm = if sortby === :count
         sortperm(info.cell_counts; rev=true)
     elseif sortby === :degree
-        axes(info.cell_counts, 1)
+        # Sort by degree descending (full cells before marginals), then count descending
+        sortperm(collect(zip(info.cell_degrees, info.cell_counts)); rev=true)
     else
         throw(ArgumentError("sortby must be :count or :degree, got :$sortby"))
     end
