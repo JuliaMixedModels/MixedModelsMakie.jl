@@ -228,10 +228,10 @@ Non-numeric columns (after applying the `cols` selector) are treated as
 categorical predictors. The `gf` column, if specified, is excluded from the
 predictor set and used as a grouping factor for counting unique levels.
 """
-function _upset_data_from_table(data; cols=All(), gf::Union{Symbol,Nothing}=nothing)
-    df = data isa DataFrame ? data : DataFrame(data)
-
-    candidate_names = Symbol.(names(select(df, cols)))
+function _upset_data_from_table(data; cols=All(), gf::Union{AbstractString,Symbol,Nothing}=nothing)
+    df = DataFrame(data)
+    gf = Symbol(gf)
+    candidate_names = propertynames(select(df, cols))
     cat_names = [n for n in candidate_names
                  if !(nonmissingtype(eltype(df[!, n])) <: Number) && n !== gf]
     isempty(cat_names) &&
@@ -252,12 +252,12 @@ chart into `f` from a pre-computed `info` NamedTuple (as returned by
 `_upset_data` or `_upset_data_from_table`).
 """
 function _upsetplot_render!(f::Indexable, info::NamedTuple;
-                            sortby::Symbol,
-                            show_empty::Bool,
-                            filled_color,
-                            empty_color,
-                            bar_color,
-                            dot_size)
+                            sortby::Symbol=:count,
+                            show_empty::Bool=true,
+                            filled_color=:black,
+                            empty_color=:lightgray,
+                            bar_color=:steelblue,
+                            dot_size=12)
     n_sets = length(info.set_labels)
 
     perm = if sortby === :count
@@ -309,7 +309,8 @@ function _upsetplot_render!(f::Indexable, info::NamedTuple;
         end
     end
 
-    isempty(empty_xs) ||
+    isempty(empty_xs) ||sortby, show_empty, filled_color,
+                              empty_color, bar_color, dot_size
         scatter!(ax_matrix, empty_xs, empty_ys; color=empty_color, markersize=dot_size)
     isempty(filled_xs) ||
         scatter!(ax_matrix, filled_xs, filled_ys; color=filled_color, markersize=dot_size)
@@ -346,15 +347,9 @@ fit `m`.
 """
 function upsetplot!(f::Indexable, m::MixedModel, data;
                     gf::Union{Symbol,Nothing}=first(fnames(m)),
-                    sortby::Symbol=:count,
-                    show_empty::Bool=true,
-                    filled_color=:black,
-                    empty_color=:lightgray,
-                    bar_color=:steelblue,
-                    dot_size=12)
+                    kwargs...)
     info = _upset_data(m, data; gf)
-    return _upsetplot_render!(f, info; sortby, show_empty, filled_color,
-                              empty_color, bar_color, dot_size)
+    return _upsetplot_render!(f, info; kwargs...)
 end
 
 """
@@ -377,15 +372,9 @@ observations.
 function upsetplot!(f::Indexable, data;
                     cols=All(),
                     gf::Union{Symbol,Nothing}=nothing,
-                    sortby::Symbol=:count,
-                    show_empty::Bool=true,
-                    filled_color=:black,
-                    empty_color=:lightgray,
-                    bar_color=:steelblue,
-                    dot_size=12)
+                    kwargs...)
     info = _upset_data_from_table(data; cols, gf)
-    return _upsetplot_render!(f, info; sortby, show_empty, filled_color,
-                              empty_color, bar_color, dot_size)
+    return _upsetplot_render!(f, info; kwargs...)
 end
 
 """
