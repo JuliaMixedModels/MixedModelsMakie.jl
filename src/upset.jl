@@ -234,6 +234,7 @@ end
     upsetplot!(f::Indexable, m::MixedModel, data;
                gf::Union{Symbol,Nothing}=first(fnames(m)),
                sortby::Symbol=:count,
+               show_empty::Bool=true,
                filled_color=:black,
                empty_color=:lightgray,
                bar_color=:steelblue,
@@ -255,6 +256,7 @@ fit `m`.
 function upsetplot!(f::Indexable, m::MixedModel, data;
                     gf::Union{Symbol,Nothing}=first(fnames(m)),
                     sortby::Symbol=:count,
+                    show_empty::Bool=true,
                     filled_color=:black,
                     empty_color=:lightgray,
                     bar_color=:steelblue,
@@ -262,7 +264,6 @@ function upsetplot!(f::Indexable, m::MixedModel, data;
     info = _upset_data(m, data; gf)
 
     n_sets = length(info.set_labels)
-    n_cells = length(info.cell_labels)
 
     perm = if sortby === :count
         sortperm(info.cell_counts; rev=true)
@@ -272,8 +273,10 @@ function upsetplot!(f::Indexable, m::MixedModel, data;
     else
         throw(ArgumentError("sortby must be :count or :degree, got :$sortby"))
     end
+    perm = show_empty ? perm : filter(i -> info.cell_counts[i] > 0, perm)
     cell_counts = info.cell_counts[perm]
     combo_matrix = info.combo_matrix[perm, :]
+    n_shown = length(cell_counts)
 
     ax_bar = Axis(f[1, 2]; ylabel="Intersection size")
     ax_matrix = Axis(f[2, 2])
@@ -285,7 +288,7 @@ function upsetplot!(f::Indexable, m::MixedModel, data;
     linkxaxes!(ax_bar, ax_matrix)
     linkyaxes!(ax_sets, ax_matrix)
 
-    barplot!(ax_bar, 1:n_cells, cell_counts; color=bar_color)
+    barplot!(ax_bar, 1:n_shown, cell_counts; color=bar_color)
 
     barplot!(ax_sets, 1:n_sets, info.set_counts; direction=:x, color=bar_color)
     ax_sets.xreversed = true
@@ -295,7 +298,7 @@ function upsetplot!(f::Indexable, m::MixedModel, data;
     filled_xs = Float64[]
     filled_ys = Float64[]
 
-    for ci in 1:n_cells
+    for ci in 1:n_shown
         active = findall(combo_matrix[ci, :])
         if length(active) >= 2
             lines!(ax_matrix, [ci, ci], [minimum(active), maximum(active)];
