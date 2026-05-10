@@ -19,6 +19,10 @@ let f = Figure()
     @test save(joinpath(OUTDIR, "upset_kb07_gridpos.png"), f)
 end
 
+# Observation counts (gf=nothing)
+f = upsetplot(m2, kb07data; gf=nothing)
+@test save(joinpath(OUTDIR, "upset_kb07_obs.png"), f)
+
 # Error: unknown grouping factor
 @test_throws ArgumentError upsetplot(m2, kb07data; gf=:nonexistent)
 

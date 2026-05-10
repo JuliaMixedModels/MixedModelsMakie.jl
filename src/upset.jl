@@ -44,19 +44,25 @@ appeared in at least one observation with condition level `j`.
 
 Returns a `NamedTuple` with fields:
 - `gf_levels`, `set_labels`, `cell_labels`, `combo_matrix`, `cell_counts`, `set_counts`
-"""
-function _upset_data(m::MixedModel, data; gf::Symbol)
-    df = data isa DataFrame ? data : DataFrame(data)
-    idx = findfirst(==(gf), fnames(m))
-    isnothing(idx) &&
-        throw(ArgumentError("$gf is not the name of a grouping variable in the model"))
 
-    gf_levels = m.reterms[idx].levels
+When `gf === nothing`, counts are observation-level rather than grouping-factor-level.
+`gf_levels` is `nothing` in that case.
+"""
+function _upset_data(m::MixedModel, data; gf::Union{Symbol,Nothing})
+    df = data isa DataFrame ? data : DataFrame(data)
+
+    if gf !== nothing
+        idx = findfirst(==(gf), fnames(m))
+        isnothing(idx) &&
+            throw(ArgumentError("$gf is not the name of a grouping variable in the model"))
+        gf_levels = m.reterms[idx].levels
+    else
+        gf_levels = nothing
+    end
+
     pred_names, pred_levels = _categorical_terms(m)
     isempty(pred_names) &&
         throw(ArgumentError("No categorical fixed-effect predictors found in model"))
-
-    n_gf = length(gf_levels)
 
     # Sets = individual condition levels, grouped by predictor (these become the columns)
     set_labels = String[string(p, ": ", lv)
@@ -94,41 +100,66 @@ function _upset_data(m::MixedModel, data; gf::Symbol)
         end
     end
 
-    # Subject membership per cell and per individual condition
-    cell_membership = falses(n_gf, n_cells)
-    set_membership = falses(n_gf, n_sets)
-
-    gf_index = Dict(lv => i for (i, lv) in enumerate(gf_levels))
-    gf_col = df[!, gf]
     pred_cols = [df[!, Symbol(p)] for p in pred_names]
 
-    for obs_i in 1:nrow(df)
-        gi = get(gf_index, gf_col[obs_i], nothing)
-        isnothing(gi) && continue
-        obs_vals = [string(pred_cols[j][obs_i]) for j in eachindex(pred_names)]
+    if gf !== nothing
+        # Grouping-factor-level counts: how many levels appeared in each cell/set
+        n_gf = length(gf_levels)
+        cell_membership = falses(n_gf, n_cells)
+        set_membership = falses(n_gf, n_sets)
 
-        for (ci, checks) in enumerate(cell_checks)
-            if all(obs_vals[j] == lv for (j, lv) in checks)
-                cell_membership[gi, ci] = true
+        gf_index = Dict(lv => i for (i, lv) in enumerate(gf_levels))
+        gf_col = df[!, gf]
+
+        for obs_i in 1:nrow(df)
+            gi = get(gf_index, gf_col[obs_i], nothing)
+            isnothing(gi) && continue
+            obs_vals = [string(pred_cols[j][obs_i]) for j in eachindex(pred_names)]
+
+            for (ci, checks) in enumerate(cell_checks)
+                if all(obs_vals[j] == lv for (j, lv) in checks)
+                    cell_membership[gi, ci] = true
+                end
+            end
+
+            for j in eachindex(pred_names)
+                si = get(set_index, (j, obs_vals[j]), nothing)
+                isnothing(si) && continue
+                set_membership[gi, si] = true
             end
         end
 
-        for j in eachindex(pred_names)
-            si = get(set_index, (j, obs_vals[j]), nothing)
-            isnothing(si) && continue
-            set_membership[gi, si] = true
+        cell_counts = [count(cell_membership[:, ci]) for ci in axes(cell_membership, 2)]
+        set_counts = [count(set_membership[:, si]) for si in axes(set_membership, 2)]
+    else
+        # Observation-level counts
+        cell_counts = zeros(Int, n_cells)
+        set_counts = zeros(Int, n_sets)
+
+        for obs_i in 1:nrow(df)
+            obs_vals = [string(pred_cols[j][obs_i]) for j in eachindex(pred_names)]
+
+            for (ci, checks) in enumerate(cell_checks)
+                if all(obs_vals[j] == lv for (j, lv) in checks)
+                    cell_counts[ci] += 1
+                    break  # each observation belongs to exactly one cell
+                end
+            end
+
+            for j in eachindex(pred_names)
+                si = get(set_index, (j, obs_vals[j]), nothing)
+                isnothing(si) && continue
+                set_counts[si] += 1
+            end
         end
     end
-
-    cell_counts = [count(cell_membership[:, ci]) for ci in axes(cell_membership, 2)]
-    set_counts = [count(set_membership[:, si]) for si in axes(set_membership, 2)]
 
     return (; gf_levels, set_labels, cell_labels, combo_matrix, cell_counts, set_counts)
 end
 
 """
     upsetplot!(f::Indexable, m::MixedModel, data;
-               gf::Symbol=first(fnames(m)),
+               gf::Union{Symbol,Nothing}=first(fnames(m)),
                sortby::Symbol=:count,
                filled_color=:black,
                empty_color=:lightgray,
@@ -149,7 +180,7 @@ in which categorical fixed-effect conditions.
 fit `m`.
 """
 function upsetplot!(f::Indexable, m::MixedModel, data;
-                    gf::Symbol=first(fnames(m)),
+                    gf::Union{Symbol,Nothing}=first(fnames(m)),
                     sortby::Symbol=:count,
                     filled_color=:black,
                     empty_color=:lightgray,
@@ -221,12 +252,13 @@ end
 
 """
     upsetplot(m::MixedModel, data;
-              gf::Symbol=first(fnames(m)),
-              sortby::Symbol=:count,
+              gf::Union{Symbol,Nothing}=first(fnames(m)),
               kwargs...)
 
 Return a `Figure` with an UpSet plot showing which levels of grouping factor `gf`
 appear in which categorical fixed-effect conditions.
+
+Pass `gf=nothing` to count observations instead of grouping-factor levels.
 
 `data` must be the same data frame (or any Tables.jl-compatible table) used to
 fit `m`.
@@ -234,6 +266,6 @@ fit `m`.
 `kwargs` are forwarded to [`upsetplot!`](@ref).
 """
 function upsetplot(m::MixedModel, data;
-                   gf::Symbol=first(fnames(m)), kwargs...)
+                   gf::Union{Symbol,Nothing}=first(fnames(m)), kwargs...)
     return upsetplot!(Figure(; size=(1000, 800)), m, data; gf, kwargs...)
 end
