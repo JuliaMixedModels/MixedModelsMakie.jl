@@ -23,48 +23,20 @@ function _categorical_terms(m::MixedModel)
 end
 
 """
-    _upset_data(m::MixedModel, data; gf::Symbol)
+    _upset_core(pred_names, pred_levels, df, gf, gf_levels)
 
-Build the data structures for an UpSet plot.
-
-**Sets (columns)** are the individual levels of each categorical fixed-effect predictor
-(e.g., `"spkr: new"`, `"spkr: old"`, `"prec: break"`, …).
-
-**Rows** are the full factorial cells — all combinations of exactly one level from each
-predictor (e.g., `"spkr: new & prec: break & load: no"`). Combinations of two levels
-from the *same* predictor are excluded because they cannot co-occur in a single
-observation.
-
-The combination matrix is structural: entry `[i, j]` is `true` if cell `i` includes
-the condition level of set `j`.
-
-Counts are data-derived: `cell_counts[i]` is the number of grouping-factor levels that
-appeared in at least one observation in cell `i`; `set_counts[j]` is the number that
-appeared in at least one observation with condition level `j`.
+Shared computation for UpSet plots: build sets, full factorial cells, structural
+combination matrix, counts, and marginal cells from already-identified predictor
+names/levels. Called by both `_upset_data` (model path) and
+`_upset_data_from_table` (table path).
 
 Returns a `NamedTuple` with fields:
-- `gf_levels`, `set_labels`, `cell_labels`, `combo_matrix`, `cell_counts`, `set_counts`
-
-When `gf === nothing`, counts are observation-level rather than grouping-factor-level.
-`gf_levels` is `nothing` in that case.
+`gf_levels`, `set_labels`, `cell_labels`, `combo_matrix`, `cell_counts`,
+`cell_degrees`, `set_counts`.
 """
-function _upset_data(m::MixedModel, data; gf::Union{Symbol,Nothing})
-    df = data isa DataFrame ? data : DataFrame(data)
-
-    if gf !== nothing
-        idx = findfirst(==(gf), fnames(m))
-        isnothing(idx) &&
-            throw(ArgumentError("$gf is not the name of a grouping variable in the model"))
-        gf_levels = m.reterms[idx].levels
-    else
-        gf_levels = nothing
-    end
-
-    pred_names, pred_levels = _categorical_terms(m)
-    isempty(pred_names) &&
-        throw(ArgumentError("No categorical fixed-effect predictors found in model"))
-
-    # Sets = individual condition levels, grouped by predictor (these become the columns)
+function _upset_core(pred_names, pred_levels, df::DataFrame,
+                     gf::Union{Symbol,Nothing}, gf_levels)
+    # Sets = individual condition levels, grouped by predictor (columns of matrix)
     set_labels = String[string(p, ": ", lv)
                         for (p, lvs) in zip(pred_names, pred_levels) for lv in lvs]
     n_sets = length(set_labels)
@@ -79,12 +51,12 @@ function _upset_data(m::MixedModel, data; gf::Union{Symbol,Nothing})
         end
     end
 
-    # Cells = full factorial: one level per predictor (these become the rows).
-    # Also store combo_strs for later marginal grouping.
+    # Cells = full factorial: one level per predictor (rows of matrix).
+    # Store combo_strs for later marginal grouping.
     cell_labels = String[]
     cell_set_indices = Vector{Int}[]
     cell_checks = Vector{Pair{Int,String}}[]
-    cell_combo_strs = Vector{String}[]   # cell_combo_strs[ci][j] = level string of pred j
+    cell_combo_strs = Vector{String}[]
 
     for combo in Iterators.product(pred_levels...)
         strs = [string(combo[j]) for j in eachindex(pred_names)]
@@ -107,7 +79,6 @@ function _upset_data(m::MixedModel, data; gf::Union{Symbol,Nothing})
     pred_cols = [df[!, Symbol(p)] for p in pred_names]
 
     if gf !== nothing
-        # Grouping-factor-level counts: how many levels appeared in each cell/set
         n_gf = length(gf_levels)
         cell_membership = falses(n_gf, n_cells)
         set_membership = falses(n_gf, n_sets)
@@ -136,7 +107,6 @@ function _upset_data(m::MixedModel, data; gf::Union{Symbol,Nothing})
         cell_counts = [count(cell_membership[:, ci]) for ci in axes(cell_membership, 2)]
         set_counts = [count(set_membership[:, si]) for si in axes(set_membership, 2)]
     else
-        # Observation-level counts
         cell_counts = zeros(Int, n_cells)
         set_counts = zeros(Int, n_sets)
 
@@ -146,7 +116,7 @@ function _upset_data(m::MixedModel, data; gf::Union{Symbol,Nothing})
             for (ci, checks) in enumerate(cell_checks)
                 if all(obs_vals[j] == lv for (j, lv) in checks)
                     cell_counts[ci] += 1
-                    break  # each observation belongs to exactly one cell
+                    break
                 end
             end
 
@@ -158,14 +128,10 @@ function _upset_data(m::MixedModel, data; gf::Union{Symbol,Nothing})
         end
     end
 
-    # Full-cell degrees: all cells have n_preds singly-specified predictors
     n_preds = length(pred_names)
     cell_degrees = fill(n_preds, n_cells)
 
-    # Marginal cells: collapse exactly one predictor (all its levels are active).
-    # A subject is "in" this cell if it appeared in full-cell observations covering
-    # *every* level of the collapsed predictor (AND specific levels of the others).
-    # For gf=nothing: sum of component full-cell observation counts.
+    # Marginal cells: collapse exactly one predictor (all its levels active).
     marginal_labels = String[]
     marginal_combo_rows = Vector{Int}[]
     marginal_counts = Int[]
@@ -178,16 +144,13 @@ function _upset_data(m::MixedModel, data; gf::Union{Symbol,Nothing})
         for other_combo in Iterators.product(other_level_seqs...)
             other_strs = [string(other_combo[k]) for k in eachindex(other_pis)]
 
-            # Full cells belonging to this marginal group (same levels for other preds)
             group = [ci for (ci, cv) in enumerate(cell_combo_strs)
                      if all(cv[other_pis[k]] == other_strs[k] for k in eachindex(other_pis))]
 
-            # Label: only the fixed (non-collapsed) predictor-level pairs
             label_parts = [string(pred_names[other_pis[k]], ": ", other_strs[k])
                            for k in eachindex(other_pis)]
             push!(marginal_labels, join(label_parts, " & "))
 
-            # Filled sets: ALL levels of the collapsed predictor + one level per other pred
             filled = Int[]
             for lv in pred_levels[collapse_pi]
                 push!(filled, set_index[(collapse_pi, string(lv))])
@@ -197,7 +160,6 @@ function _upset_data(m::MixedModel, data; gf::Union{Symbol,Nothing})
             end
             push!(marginal_combo_rows, sort!(filled))
 
-            # Count
             if gf !== nothing
                 m_mem = trues(length(gf_levels))
                 for ci in group
@@ -212,7 +174,6 @@ function _upset_data(m::MixedModel, data; gf::Union{Symbol,Nothing})
         end
     end
 
-    # Combine full cells + marginal cells
     n_marginals = length(marginal_labels)
     marginal_combo = falses(n_marginals, n_sets)
     for (mi, filled) in enumerate(marginal_combo_rows)
@@ -221,9 +182,9 @@ function _upset_data(m::MixedModel, data; gf::Union{Symbol,Nothing})
         end
     end
 
-    all_labels = vcat(cell_labels, marginal_labels)
-    all_combo  = vcat(combo_matrix, marginal_combo)
-    all_counts = vcat(cell_counts, marginal_counts)
+    all_labels  = vcat(cell_labels, marginal_labels)
+    all_combo   = vcat(combo_matrix, marginal_combo)
+    all_counts  = vcat(cell_counts, marginal_counts)
     all_degrees = vcat(cell_degrees, marginal_degrees)
 
     return (; gf_levels, set_labels, cell_labels=all_labels, combo_matrix=all_combo,
@@ -231,56 +192,89 @@ function _upset_data(m::MixedModel, data; gf::Union{Symbol,Nothing})
 end
 
 """
-    upsetplot!(f::Indexable, m::MixedModel, data;
-               gf::Union{Symbol,Nothing}=first(fnames(m)),
-               sortby::Symbol=:count,
-               show_empty::Bool=true,
-               filled_color=:black,
-               empty_color=:lightgray,
-               bar_color=:steelblue,
-               dot_size=12)
+    _upset_data(m::MixedModel, data; gf)
 
-Add an UpSet plot to `f` showing which levels of grouping factor `gf` appear
-in which categorical fixed-effect conditions.
+Build UpSet data structures from a fitted model and its data.
 
-**Layout (standard UpSet orientation):**
-- top-right: intersection-size bar chart (subjects per full factorial cell)
-- middle-right: combination matrix — rows are individual condition levels (sets),
-  columns are full factorial cells; filled circles mark which condition levels are
-  active in each cell, connected by a vertical line
-- middle-left: set-size bar chart (subjects per individual condition level)
-
-`data` must be the same data frame (or any Tables.jl-compatible table) used to
-fit `m`.
+Predictor names and levels are extracted via formula introspection
+(`_categorical_terms`); the grouping-factor levels come from the model's
+random-effects term. Delegates counting and cell construction to `_upset_core`.
 """
-function upsetplot!(f::Indexable, m::MixedModel, data;
-                    gf::Union{Symbol,Nothing}=first(fnames(m)),
-                    sortby::Symbol=:count,
-                    show_empty::Bool=true,
-                    filled_color=:black,
-                    empty_color=:lightgray,
-                    bar_color=:steelblue,
-                    dot_size=12)
-    info = _upset_data(m, data; gf)
+function _upset_data(m::MixedModel, data; gf::Union{Symbol,Nothing})
+    df = data isa DataFrame ? data : DataFrame(data)
 
+    if gf !== nothing
+        idx = findfirst(==(gf), fnames(m))
+        isnothing(idx) &&
+            throw(ArgumentError("$gf is not the name of a grouping variable in the model"))
+        gf_levels = m.reterms[idx].levels
+    else
+        gf_levels = nothing
+    end
+
+    pred_names, pred_levels = _categorical_terms(m)
+    isempty(pred_names) &&
+        throw(ArgumentError("No categorical fixed-effect predictors found in model"))
+
+    return _upset_core(pred_names, pred_levels, df, gf, gf_levels)
+end
+
+"""
+    _upset_data_from_table(data; cols=All(), gf=nothing)
+
+Build UpSet data structures directly from a Tables.jl-compatible table.
+
+Non-numeric columns (after applying the `cols` selector) are treated as
+categorical predictors. The `gf` column, if specified, is excluded from the
+predictor set and used as a grouping factor for counting unique levels.
+"""
+function _upset_data_from_table(data; cols=All(), gf::Union{Symbol,Nothing}=nothing)
+    df = data isa DataFrame ? data : DataFrame(data)
+
+    candidate_names = Symbol.(names(select(df, cols)))
+    cat_names = [n for n in candidate_names
+                 if !(nonmissingtype(eltype(df[!, n])) <: Number) && n !== gf]
+    isempty(cat_names) &&
+        throw(ArgumentError("No categorical columns found in data after filtering"))
+
+    pred_names  = string.(cat_names)
+    pred_levels = [sort!(unique(string.(skipmissing(df[!, n])))) for n in cat_names]
+    gf_levels   = gf !== nothing ? sort!(unique(df[!, gf])) : nothing
+
+    return _upset_core(pred_names, pred_levels, df, gf, gf_levels)
+end
+
+"""
+    _upsetplot_render!(f::Indexable, info::NamedTuple; kwargs...)
+
+Render the UpSet combination matrix, intersection bar chart, and set-size bar
+chart into `f` from a pre-computed `info` NamedTuple (as returned by
+`_upset_data` or `_upset_data_from_table`).
+"""
+function _upsetplot_render!(f::Indexable, info::NamedTuple;
+                            sortby::Symbol,
+                            show_empty::Bool,
+                            filled_color,
+                            empty_color,
+                            bar_color,
+                            dot_size)
     n_sets = length(info.set_labels)
 
     perm = if sortby === :count
         sortperm(info.cell_counts; rev=true)
     elseif sortby === :degree
-        # Sort by degree descending (full cells before marginals), then count descending
         sortperm(collect(zip(info.cell_degrees, info.cell_counts)); rev=true)
     else
         throw(ArgumentError("sortby must be :count or :degree, got :$sortby"))
     end
     perm = show_empty ? perm : filter(i -> info.cell_counts[i] > 0, perm)
-    cell_counts = info.cell_counts[perm]
+    cell_counts  = info.cell_counts[perm]
     combo_matrix = info.combo_matrix[perm, :]
     n_shown = length(cell_counts)
 
-    ax_bar = Axis(f[1, 2]; ylabel="Intersection size")
+    ax_bar    = Axis(f[1, 2]; ylabel="Intersection size")
     ax_matrix = Axis(f[2, 2])
-    ax_sets = Axis(f[2, 1]; xlabel="Set size")
+    ax_sets   = Axis(f[2, 1]; xlabel="Set size")
 
     hidexdecorations!(ax_bar; grid=false)
     hidexdecorations!(ax_matrix; grid=false)
@@ -328,6 +322,73 @@ function upsetplot!(f::Indexable, m::MixedModel, data;
 end
 
 """
+    upsetplot!(f::Indexable, m::MixedModel, data;
+               gf::Union{Symbol,Nothing}=first(fnames(m)),
+               sortby::Symbol=:count,
+               show_empty::Bool=true,
+               filled_color=:black,
+               empty_color=:lightgray,
+               bar_color=:steelblue,
+               dot_size=12)
+
+Add an UpSet plot to `f` showing which levels of grouping factor `gf` appear
+in which categorical fixed-effect conditions.
+
+**Layout (standard UpSet orientation):**
+- top-right: intersection-size bar chart (subjects per full factorial cell)
+- middle-right: combination matrix — rows are individual condition levels (sets),
+  columns are full factorial cells; filled circles mark which condition levels are
+  active in each cell, connected by a vertical line
+- middle-left: set-size bar chart (subjects per individual condition level)
+
+`data` must be the same data frame (or any Tables.jl-compatible table) used to
+fit `m`.
+"""
+function upsetplot!(f::Indexable, m::MixedModel, data;
+                    gf::Union{Symbol,Nothing}=first(fnames(m)),
+                    sortby::Symbol=:count,
+                    show_empty::Bool=true,
+                    filled_color=:black,
+                    empty_color=:lightgray,
+                    bar_color=:steelblue,
+                    dot_size=12)
+    info = _upset_data(m, data; gf)
+    return _upsetplot_render!(f, info; sortby, show_empty, filled_color,
+                              empty_color, bar_color, dot_size)
+end
+
+"""
+    upsetplot!(f::Indexable, data;
+               cols=All(),
+               gf::Union{Symbol,Nothing}=nothing,
+               sortby::Symbol=:count,
+               show_empty::Bool=true,
+               filled_color=:black,
+               empty_color=:lightgray,
+               bar_color=:steelblue,
+               dot_size=12)
+
+Add an UpSet plot to `f` directly from a Tables.jl-compatible table.
+
+Non-numeric columns (optionally restricted by `cols`) become the sets. Pass
+`gf=:col` to count unique values of that column per cell instead of
+observations.
+"""
+function upsetplot!(f::Indexable, data;
+                    cols=All(),
+                    gf::Union{Symbol,Nothing}=nothing,
+                    sortby::Symbol=:count,
+                    show_empty::Bool=true,
+                    filled_color=:black,
+                    empty_color=:lightgray,
+                    bar_color=:steelblue,
+                    dot_size=12)
+    info = _upset_data_from_table(data; cols, gf)
+    return _upsetplot_render!(f, info; sortby, show_empty, filled_color,
+                              empty_color, bar_color, dot_size)
+end
+
+"""
     upsetplot(m::MixedModel, data;
               gf::Union{Symbol,Nothing}=first(fnames(m)),
               kwargs...)
@@ -345,4 +406,19 @@ fit `m`.
 function upsetplot(m::MixedModel, data;
                    gf::Union{Symbol,Nothing}=first(fnames(m)), kwargs...)
     return upsetplot!(Figure(; size=(1000, 800)), m, data; gf, kwargs...)
+end
+
+"""
+    upsetplot(data; cols=All(), gf::Union{Symbol,Nothing}=nothing, kwargs...)
+
+Return a `Figure` with an UpSet plot built directly from a Tables.jl-compatible
+table.
+
+Non-numeric columns (optionally restricted by `cols`) are used as sets. Pass
+`gf=:col` to count unique values of that column per cell instead of observations.
+
+`kwargs` are forwarded to [`upsetplot!`](@ref).
+"""
+function upsetplot(data; cols=All(), gf::Union{Symbol,Nothing}=nothing, kwargs...)
+    return upsetplot!(Figure(; size=(1000, 800)), data; cols, gf, kwargs...)
 end
