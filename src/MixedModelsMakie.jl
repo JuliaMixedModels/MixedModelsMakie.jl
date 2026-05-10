@@ -11,6 +11,7 @@ using PrecompileTools
 using Printf
 using SpecialFunctions
 using StatsBase
+using StatsModels: StatsModels, CategoricalTerm, terms
 
 # why, BSplineKit, do you export fit???
 using MixedModels: fit
@@ -36,6 +37,8 @@ export RanefInfo,
        simplelinreg,
        splom!,
        splomaxes!,
+       upsetplot,
+       upsetplot!,
        zetaplot,
        zetaplot!
 
@@ -59,6 +62,7 @@ include("ridge.jl")
 include("ridge2d.jl")
 include("xyplot.jl")
 include("recipes.jl")
+include("upset.jl")
 
 @setup_workload begin
     model = fit(MixedModel, @formula(reaction ~ 1 + days + (1 + days | subj)),
