@@ -243,6 +243,70 @@ profiledensity(pr1; share_y_scale=false)
 profiledensity(pr1; ptyp='σ')
 ```
 
+## UpSet Plots
+
+UpSet plots[^upset] visualize the intersection structure of categorical conditions,
+showing which combinations of condition levels co-occur in the data and how many
+observations (or grouping-factor levels) fall in each combination.
+
+[^upset]: Lex, A., Gehlenborg, N., Strobelt, H., Vuillemot, R., & Pfister, H. (2014). UpSet: Visualization of Intersecting Sets. IEEE Transactions on Visualization and Computer Graphics, 20(12), 1983–1992. https://doi.org/10.1109/TVCG.2014.2346248
+
+**Sets** are the individual levels of each categorical predictor (e.g., `"gender: M"`,
+`"gender: F"`, `"btype: curse"`).
+**Columns** of the combination matrix are the full factorial cells — every combination
+of one level per predictor — plus *marginal cells* where all levels of a single
+predictor are simultaneously active (showing whether that predictor is within-subjects
+or between-subjects). A filled circle means that condition level is active in that
+column; a connecting line spans the active conditions within each column. The top bars
+show counts per column; the left bars show counts per individual condition level.
+
+A column in which only within-subjects predictors are collapsed will have non-zero
+counts; a column where a *between*-subjects predictor is collapsed will be empty
+because no single unit can appear in all levels of a between-subjects factor.
+
+```@docs
+upsetplot
+```
+
+```@docs
+upsetplot!
+```
+
+```@example UpSet
+using CairoMakie
+CairoMakie.activate!(; type="svg")
+using DataFrames: Not
+using MixedModels
+using MixedModelsMakie
+
+verbagg = MixedModels.dataset(:verbagg)
+
+gm1 = fit(MixedModel,
+          @formula(r2 ~ 1 + anger + gender + btype + situ + (1|subj) + (1+gender|item)),
+          verbagg, Bernoulli(); progress=false)
+
+# gender is between-subjects; btype and situ are within-subjects.
+# Marginal cells that collapse gender are empty (no subject has both genders),
+# while marginals that collapse btype or situ are non-empty.
+upsetplot(gm1, verbagg; gf=:subj, show_empty=false)
+```
+
+```@example UpSet
+# Observation counts instead of subject counts
+upsetplot(gm1, verbagg; gf=nothing, show_empty=false)
+```
+
+```@example UpSet
+# Table-based: no model required — non-numeric columns are detected automatically.
+# Numeric columns (r2, anger) and explicit exclusions (subj, item) are dropped.
+upsetplot(verbagg; cols=Not([:subj, :item]), gf=:subj, show_empty=false)
+```
+
+```@example UpSet
+# Sort by degree (full factorial cells first, then marginals) rather than by count
+upsetplot(gm1, verbagg; gf=:subj, sortby=:degree, show_empty=false)
+```
+
 ## General plots
 
 We also provide a `splom` or scatter-plot matrix plot for data frames with numeric columns (i.e. a matrix of all pairwise plots).
