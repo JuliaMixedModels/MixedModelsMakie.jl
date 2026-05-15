@@ -117,14 +117,22 @@ function coefplot!(ax::Axis, xs::Union{MixedModel,MixedModelBootstrap}...;
     all(_coefnames(m; show_intercept) == cn for m in xs) ||
         throw(ArgumentError("Inputs differ in coefficient names"))
 
-    for (x, label) in zip(xs, labels)
+    user_color = get(attributes, :color, nothing)
+    palette = Makie.wong_colors()
+
+    for (idx, (x, label)) in enumerate(zip(xs, labels))
+        model_color = !isnothing(user_color) ? user_color :
+                      length(xs) == 1 ? nothing :
+                      palette[mod1(idx, length(palette))]
+        color_kwarg = isnothing(model_color) ? (;) : (; color=model_color)
+
         ci = confint_table(x, conf_level; show_intercept)
         y = nrow(ci):-1:1
         xvals = ci.estimate
-        scatter!(ax, xvals, y; attributes..., scatter_attributes..., label)
+        scatter!(ax, xvals, y; attributes..., scatter_attributes..., label, color_kwarg...)
         errorbars!(ax, xvals, y, xvals .- ci.lower, ci.upper .- xvals;
                    direction=:x, attributes..., errorbars_attributes...,
-                   label)
+                   label, color_kwarg...)
     end
 
     vline_at_zero && vlines!(ax, 0; color=(:black, 0.75), linestyle=:dash)
