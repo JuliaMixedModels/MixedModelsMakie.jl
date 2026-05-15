@@ -29,8 +29,8 @@ m1 = fit(MixedModel,
          MixedModels.dataset(:sleepstudy); progress)
 
 m1_speed = fit(MixedModel,
-         @formula(1000 / reaction ~ 1 + days + (1 + days | subj)),
-         MixedModels.dataset(:sleepstudy); progress)
+               @formula(1000 / reaction ~ 1 + days + (1 + days | subj)),
+               MixedModels.dataset(:sleepstudy); progress)
 
 m1zc = fit(MixedModel,
            @formula(1000 / reaction ~ 1 + days + zerocorr(1 + days | subj)),
