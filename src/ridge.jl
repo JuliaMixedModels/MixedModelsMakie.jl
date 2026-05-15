@@ -1,7 +1,7 @@
 """
     ridgeplot(x::Union{MixedModel,MixedModelBootstrap}...; kwargs...)::Figure
     ridgeplot!(fig::$(Indexable), x::MixedModelBootstrap...;
-               show_legend=true, legend_attributes=(;), kwargs...)
+               show_legend=length(xs) > 1, legend_attributes=(;), kwargs...)
     ridgeplot!(ax::Axis, x::MixedModelBootstrap...;
                conf_level=0.95, vline_at_zero=true, show_intercept=true,
                scatter_attributes=(;),
@@ -49,7 +49,9 @@ The mutating methods return the original object.
     Inestimable coefficients (coefficients removed by pivoting in the rank deficient case)
     are excluded.
 """
-function ridgeplot(xs::MixedModelBootstrap...; show_intercept=true, show_legend=true,
+function ridgeplot(xs::MixedModelBootstrap...;
+                   show_intercept=true,
+                   show_legend=length(xs) > 1,
                    kwargs...)
     width = 640
     height = max(200, 100 * _npreds(first(xs); show_intercept))

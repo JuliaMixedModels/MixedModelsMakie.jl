@@ -1,7 +1,7 @@
 """
     coefplot(xs::Union{MixedModel,MixedModelBootstrap}...; kwargs...)::Figure
     coefplot!(fig::$(Indexable), xs::Union{MixedModel,MixedModelBootstrap}...;
-              show_legend=true, legend_attributes=(;), kwargs...)
+              show_legend=length(xs) > 1, legend_attributes=(;), kwargs...)
     coefplot!(ax::Axis, xs::Union{MixedModel,MixedModelBootstrap}...;
               conf_level=0.95, vline_at_zero=true, show_intercept=true,
               scatter_attributes=(;),
@@ -42,7 +42,7 @@ The mutating methods return the original object.
 """
 function coefplot(xs::Union{MixedModel,MixedModelBootstrap}...;
                   show_intercept=true,
-                  show_legend=true,
+                  show_legend=length(xs) > 1,
                   kwargs...)
     width = 640
     # need to guarantee a min height of 150
