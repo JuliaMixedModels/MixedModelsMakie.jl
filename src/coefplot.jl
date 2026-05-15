@@ -1,22 +1,38 @@
 """
-    coefplot(x::Union{MixedModel,MixedModelBootstrap}; kwargs...)::Figure
-    coefplot!(fig::$(Indexable), x::Union{MixedModel,MixedModelBootstrap};
-              kwargs...)
-    coefplot!(ax::Axis, Union{MixedModel,MixedModelBootstrap};
+    coefplot(xs::Union{MixedModel,MixedModelBootstrap}...; kwargs...)::Figure
+    coefplot!(fig::$(Indexable), xs::Union{MixedModel,MixedModelBootstrap}...;
+              show_legend=true, legend_attributes=(;), kwargs...)
+    coefplot!(ax::Axis, xs::Union{MixedModel,MixedModelBootstrap}...;
               conf_level=0.95, vline_at_zero=true, show_intercept=true,
               scatter_attributes=(;),
               errorbars_attributes=(;),
+              show_legend=length(xs) > 1,
+              legend_attributes=(;),
+              labels=string.(1:length(xs)),
               attributes...)
 
 Create a coefficient plot of the fixed-effects and associated confidence intervals.
-
-Inestimable coefficients (coefficients removed by pivoting in the rank deficient case) are excluded.
+When multiple models are supplied, they are overlaid on the same axes for comparison;
+all models must share the same coefficient names.
 
 `attributes` are passed onto both `scatter!` and `errorbars!`, while
 `scatter_attributes` and `errorbars_attributes` are passed only onto `scatter!` and
 `errorbars!`, respectively. (Starting with Makie 0.21, unsupported attributes for a
-given plottype are no longer silently ignored, so it's necessary so separate out the
+given plottype are no longer silently ignored, so it's necessary to separate out the
 attributes that are only valid for a single plot type.)
+
+`labels` controls the legend entry for each model (defaults to `"1"`, `"2"`, ...).
+
+`show_legend` controls placement of the legend. Accepted values:
+- `false`: no legend
+- `true` or `:bottom`: horizontal legend below the axis (default for multi-model figures)
+- `:top`: horizontal legend above the axis
+- `:left`: vertical legend to the left of the axis
+- `:right`: vertical legend to the right of the axis
+- `:axis`: legend embedded inside the axis via `axislegend`
+
+`legend_attributes` is a named tuple of keyword arguments forwarded to the Makie
+`Legend` (or `axislegend`) constructor.
 
 The mutating methods return the original object.
 
@@ -24,24 +40,24 @@ The mutating methods return the original object.
     Inestimable coefficients (coefficients removed by pivoting in the rank deficient case)
     are excluded.
 """
-function coefplot(x::Union{MixedModel,MixedModelBootstrap}...;
+function coefplot(xs::Union{MixedModel,MixedModelBootstrap}...;
                   show_intercept=true,
                   show_legend=true,
                   kwargs...)
     width = 640
     # need to guarantee a min height of 150
-    height = max(150, 75 * _npreds(first(x); show_intercept))
+    height = max(150, 75 * _npreds(first(xs); show_intercept))
 
     width += 50 * (show_legend in (:left, :right))
     height += 50 * (show_legend in (true, :top, :bottom))
 
     fig = Figure(; size=(width, height))
-    coefplot!(fig, x...; show_intercept, show_legend, kwargs...)
+    coefplot!(fig, xs...; show_intercept, show_legend, kwargs...)
     return fig
 end
 
 """$(@doc coefplot)"""
-function coefplot!(fig::Indexable, x::Union{MixedModel,MixedModelBootstrap}...; show_legend=true, legend_attributes=(;), kwargs...)
+function coefplot!(fig::Indexable, xs::Union{MixedModel,MixedModelBootstrap}...; show_legend=true, legend_attributes=(;), kwargs...)
     ax = Axis(fig[1, 1])
     kwargs = _extract_title!(ax, kwargs)
     axis_legend = show_legend === :axis
@@ -49,7 +65,7 @@ function coefplot!(fig::Indexable, x::Union{MixedModel,MixedModelBootstrap}...; 
     if axis_legend
         show_legend = false
     end
-    coefplot!(ax, x...; legend_attributes, show_legend=axis_legend, kwargs...)
+    coefplot!(ax, xs...; legend_attributes, show_legend=axis_legend, kwargs...)
 
     if show_legend == true || show_legend === :bottom
         fig[2, 1] = Legend(fig, ax;
