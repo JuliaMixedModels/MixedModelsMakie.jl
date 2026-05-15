@@ -57,11 +57,12 @@ function coefplot(xs::Union{MixedModel,MixedModelBootstrap}...;
 end
 
 """$(@doc coefplot)"""
-function coefplot!(fig::Indexable, xs::Union{MixedModel,MixedModelBootstrap}...; show_legend=true, legend_attributes=(;), kwargs...)
+function coefplot!(fig::Indexable, xs::Union{MixedModel,MixedModelBootstrap}...;
+                   show_legend=true, legend_attributes=(;), kwargs...)
     ax = Axis(fig[1, 1])
     kwargs = _extract_title!(ax, kwargs)
     axis_legend = show_legend === :axis
-    legend_attributes = merge((;merge=true,unique=true), legend_attributes)
+    legend_attributes = merge((; merge=true, unique=true), legend_attributes)
     if axis_legend
         show_legend = false
     end
@@ -69,10 +70,10 @@ function coefplot!(fig::Indexable, xs::Union{MixedModel,MixedModelBootstrap}...;
 
     if show_legend == true || show_legend === :bottom
         fig[2, 1] = Legend(fig, ax;
-                            orientation=:horizontal,
-                            tell_width=false,
-                            tell_height=false,
-                            legend_attributes...)
+                           orientation=:horizontal,
+                           tell_width=false,
+                           tell_height=false,
+                           legend_attributes...)
     elseif show_legend === :top
         fig[0, 1] = Legend(fig, ax;
                            orientation=:horizontal,
@@ -110,12 +111,11 @@ function coefplot!(ax::Axis, xs::Union{MixedModel,MixedModelBootstrap}...;
                    legend_attributes=(;),
                    labels=string.(1:length(xs)),
                    attributes...)
-
     x = first(xs)
     cn = _coefnames(x; show_intercept)
     nticks = _npreds(x; show_intercept)
     all(_coefnames(m; show_intercept) == cn for m in xs) ||
-       throw(ArgumentError("Inputs differ in coefficient names"))
+        throw(ArgumentError("Inputs differ in coefficient names"))
 
     for (x, label) in zip(xs, labels)
         ci = confint_table(x, conf_level; show_intercept)
@@ -131,7 +131,7 @@ function coefplot!(ax::Axis, xs::Union{MixedModel,MixedModelBootstrap}...;
 
     # this is the axis method, so we only have the axislegend
     if show_legend
-        legend_attributes = merge((;merge=true,unique=true), legend_attributes)
+        legend_attributes = merge((; merge=true, unique=true), legend_attributes)
         axislegend(ax; legend_attributes...)
     end
 
