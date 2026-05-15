@@ -33,7 +33,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Julia Setup
-        uses: julia-actions/setup-julia@f6f565d9f7cf12f53dc8045742460d6260ad3b39 # v3
+        uses: julia-actions/setup-julia@f6f565d9f7cf12f53dc8045742460d6260ad3b39 # v3.0.1
         with:
           version: ${{ matrix.version }}
       - name: Cache
