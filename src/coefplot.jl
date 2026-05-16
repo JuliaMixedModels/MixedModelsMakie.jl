@@ -38,7 +38,8 @@ The mutating methods return the original object.
 
 !!! note
     Inestimable coefficients (coefficients removed by pivoting in the rank deficient case)
-    are excluded.
+    are excluded. When multiple models are provided, they must have the same
+    coefficient names _after_ dropping inestimable coefficients.
 """
 function coefplot(xs::Union{MixedModel,MixedModelBootstrap}...;
                   show_intercept=true,
