@@ -141,41 +141,54 @@ function ridgeplot!(ax::Axis, xs::MixedModelBootstrap...;
         "Normalized bootstrap density"
     end
 
-    user_color = get(attributes, :color, nothing)
-    palette = Makie.wong_colors()
+    if length(xs) == 1
+        color = get(attributes, :color, :black)
+        attributes = merge((;color=color), attributes)
+        band_color = get(band_attributes, :color, :black)
+        band_attributes = merge((;color=band_color), band_attributes)
+        lines_color = get(attributes, :color, :black)
+        lines_attributes = merge((;color=lines_color), lines_attributes)
 
-    if !ismissing(conf_level)
-        default_color = (isnothing(user_color) && length(xs) == 1) ? (; color=:black) : (;)
-        coefplot!(ax, xs...; conf_level, vline_at_zero, show_intercept,
-                  default_color..., scatter_attributes, errorbars_attributes,
-                  show_legend=false, labels, attributes...)
     end
 
     attributes = _extract_title!(ax, attributes)
     ax.xlabel = xlabel
 
     for (idx, (bootstrap, label)) in enumerate(zip(xs, labels))
-        model_color = if !isnothing(user_color)
-            user_color
-        elseif length(xs) == 1
-            :black
-        else
-            palette[mod1(idx, length(palette))]
-        end
-        model_attributes = merge((; attributes...), (; color=model_color))
-        model_band_attributes = merge((; color=(_color(model_color), 0.3)), band_attributes)
-
         df = transform!(DataFrame(bootstrap.β), :coefname => ByRow(string) => :coefname)
         filter!(:coefname => in(_coefnames(bootstrap; show_intercept)), df)
         gdf = groupby(df, :coefname)
         dens = combine(gdf, :β => kde => :kde)
 
+        if !ismissing(conf_level)
+            # default_color = (isnothing(user_color) && length(xs) == 1) ? (; color=:black) : (;)
+            coefplot!(ax, bootstrap; 
+                      conf_level, 
+                      vline_at_zero, 
+                      show_intercept,
+                      show_legend=false, 
+                      color=Cycled(idx),
+                      labels=[label], 
+                      scatter_attributes, 
+                      errorbars_attributes,
+                      attributes...)
+        end
+
         for (offset, row) in enumerate(reverse(eachrow(dens)))
             dd = 0.95 * row.kde.density ./ maximum(row.kde.density)
             lower = Point2f.(row.kde.x, offset)
             upper = Point2f.(row.kde.x, dd .+ offset)
-            band!(ax, lower, upper; model_attributes..., model_band_attributes...)
-            lines!(ax, upper; model_attributes..., lines_attributes..., label)
+            band!(ax, lower, upper; 
+                  color=Cycled(idx),
+                  alpha=0.3,
+                  attributes..., 
+                  band_attributes..., 
+                  label)
+            lines!(ax, upper;
+                   color=Cycled(idx), 
+                   attributes..., 
+                   lines_attributes..., 
+                   label)
         end
     end
 
