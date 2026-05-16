@@ -89,9 +89,9 @@ function _place_legend!(figure, axis, position; kwargs...)
     else
         throw(ArgumentError("Invalid legend position: $position"))
     end
-    figure[x, y] = Legend(figure, axis; 
-                          orientation, 
-                          tell_width=false, 
+    figure[x, y] = Legend(figure, axis;
+                          orientation,
+                          tell_width=false,
                           tell_height=false,
                           kwargs...)
     return figure

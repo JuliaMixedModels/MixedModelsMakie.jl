@@ -92,7 +92,7 @@ function coefplot!(ax::Axis, xs::Union{MixedModel,MixedModelBootstrap}...;
 
     if length(xs) == 1
         color = get(attributes, :color, :black)
-        attributes = merge((;color=color), attributes)
+        attributes = merge((; color=color), attributes)
     end
 
     for (x, label) in zip(xs, labels)

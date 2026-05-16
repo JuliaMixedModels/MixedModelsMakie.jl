@@ -143,12 +143,11 @@ function ridgeplot!(ax::Axis, xs::MixedModelBootstrap...;
 
     if length(xs) == 1
         color = get(attributes, :color, :black)
-        attributes = merge((;color=color), attributes)
+        attributes = merge((; color=color), attributes)
         band_color = get(band_attributes, :color, :black)
-        band_attributes = merge((;color=band_color), band_attributes)
+        band_attributes = merge((; color=band_color), band_attributes)
         lines_color = get(attributes, :color, :black)
-        lines_attributes = merge((;color=lines_color), lines_attributes)
-
+        lines_attributes = merge((; color=lines_color), lines_attributes)
     end
 
     attributes = _extract_title!(ax, attributes)
@@ -162,14 +161,14 @@ function ridgeplot!(ax::Axis, xs::MixedModelBootstrap...;
 
         if !ismissing(conf_level)
             # default_color = (isnothing(user_color) && length(xs) == 1) ? (; color=:black) : (;)
-            coefplot!(ax, bootstrap; 
-                      conf_level, 
-                      vline_at_zero, 
+            coefplot!(ax, bootstrap;
+                      conf_level,
+                      vline_at_zero,
                       show_intercept,
-                      show_legend=false, 
+                      show_legend=false,
                       color=Cycled(idx),
-                      labels=[label], 
-                      scatter_attributes, 
+                      labels=[label],
+                      scatter_attributes,
                       errorbars_attributes,
                       attributes...)
         end
@@ -178,16 +177,16 @@ function ridgeplot!(ax::Axis, xs::MixedModelBootstrap...;
             dd = 0.95 * row.kde.density ./ maximum(row.kde.density)
             lower = Point2f.(row.kde.x, offset)
             upper = Point2f.(row.kde.x, dd .+ offset)
-            band!(ax, lower, upper; 
+            band!(ax, lower, upper;
                   color=Cycled(idx),
                   alpha=0.3,
-                  attributes..., 
-                  band_attributes..., 
+                  attributes...,
+                  band_attributes...,
                   label)
             lines!(ax, upper;
-                   color=Cycled(idx), 
-                   attributes..., 
-                   lines_attributes..., 
+                   color=Cycled(idx),
+                   attributes...,
+                   lines_attributes...,
                    label)
         end
     end
