@@ -2,8 +2,8 @@ f = coefplot(m1)
 @test save(joinpath(OUTDIR, "coef_sleepstudy.png"), f)
 
 for legend_pos in (true, false, :top, :bottom, :left, :right, :axis)
-    f = coefplot(m0, m1zc, m1; show_legend=legend_pos,
-                 labels=["intercept", "zerocorr", "full"])
+    local f = coefplot(m0, m1zc, m1; show_legend=legend_pos,
+                       labels=["intercept", "zerocorr", "full"])
     @test save(joinpath(OUTDIR, "coef_sleepstudy_legend_$(legend_pos).png"), f)
 end
 
