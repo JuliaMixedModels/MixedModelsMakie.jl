@@ -69,35 +69,7 @@ function coefplot!(fig::Indexable, xs::Union{MixedModel,MixedModelBootstrap}...;
     end
     coefplot!(ax, xs...; legend_attributes, show_legend=axis_legend, kwargs...)
 
-    if show_legend == true || show_legend === :bottom
-        fig[2, 1] = Legend(fig, ax;
-                           orientation=:horizontal,
-                           tell_width=false,
-                           tell_height=false,
-                           legend_attributes...)
-    elseif show_legend === :top
-        fig[0, 1] = Legend(fig, ax;
-                           orientation=:horizontal,
-                           tell_width=false,
-                           tell_height=false,
-                           legend_attributes...)
-    elseif show_legend === :left
-        fig[1, 0] = Legend(fig, ax;
-                           orientation=:vertical,
-                           tell_width=false,
-                           tell_height=false,
-                           legend_attributes...)
-    elseif show_legend === :right
-        fig[1, 2] = Legend(fig, ax;
-                           orientation=:vertical,
-                           tell_width=false,
-                           tell_height=false,
-                           legend_attributes...)
-    elseif show_legend == false
-        # do nothing
-    else
-        throw(ArgumentError("Invalid legend position"))
-    end
+    _place_legend!(fig, ax, show_legend; legend_attributes...)
     return fig
 end
 
