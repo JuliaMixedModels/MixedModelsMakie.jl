@@ -160,7 +160,6 @@ function ridgeplot!(ax::Axis, xs::MixedModelBootstrap...;
         dens = combine(gdf, :β => kde => :kde)
 
         if !ismissing(conf_level)
-            # default_color = (isnothing(user_color) && length(xs) == 1) ? (; color=:black) : (;)
             coefplot!(ax, bootstrap;
                       conf_level,
                       vline_at_zero,
