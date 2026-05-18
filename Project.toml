@@ -49,5 +49,5 @@ TestSetExtensions = "98d24dd4-01ad-11ea-1b02-c9a08f80db04"
 [targets]
 test = ["Aqua", "Test", "TestSetExtensions", "CairoMakie", "Random", "Statistics", "Suppressor"]
 
-[workspace]
-projects = ["docs"]
+# [workspace]
+# projects = ["docs"]
