@@ -232,7 +232,8 @@ end
 
 Return a `NamedTuple{fnames(m), NTuple(k, ShrinkageInfo)}` from model `m`
 """
-function shrinkageinfo(m::MixedModel{T}, θref::Vector{<:AbstractFloat}=_ref_theta(m)) where {T}
+function shrinkageinfo(m::MixedModel{T},
+                       θref::Vector{<:AbstractFloat}=_ref_theta(m)) where {T}
     fn = fnames(m)
     val = sizehint!(ShrinkageInfo[], length(fn))
     re = ranef(m)
@@ -248,11 +249,12 @@ end
 
 Return a `Shrinkageinfo` corresponding to the grouping variable `gf` model `m`.
 """
-function shrinkageinfo(m::MixedModel, gf::Symbol, θref::Vector{<:AbstractFloat}=_ref_theta(m))
-    return shrinkageinfo(m, gf, ranef(m), _ranef(m, θref)) 
+function shrinkageinfo(m::MixedModel, gf::Symbol,
+                       θref::Vector{<:AbstractFloat}=_ref_theta(m))
+    return shrinkageinfo(m, gf, ranef(m), _ranef(m, θref))
 end
 
-function shrinkageinfo(m::MixedModel{T}, gf::Symbol, 
+function shrinkageinfo(m::MixedModel{T}, gf::Symbol,
                        re::Vector{Matrix{T}}, re_inf::Vector{Matrix{T}}) where {T}
     idx = _group_idx(m, gf)
     # XXX replace ranef(m)[idx] with ranef(m, gf) when that becomes available upstream
