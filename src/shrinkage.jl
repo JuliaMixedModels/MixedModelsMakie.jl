@@ -203,7 +203,7 @@ function _shrinkage_panel!(ax::Axis, i::Int, j::Int, reref, reest, λ;
     plt = scatter!(ax, u, v; color=shrunk_dotcolor)  # conditional means at estimates
     if !isempty(label_idx)
         text!(ax, view(x, label_idx), view(y, label_idx);
-              text=labelnames, color=labelcolor, fontsize=labelsize,
+              text=view(labelnames, label_idx), color=labelcolor, fontsize=labelsize,
               offset=(4, 4))
     end
     if ellipse
