@@ -36,9 +36,7 @@ end
 Return a `RanefInfo` corresponding to the grouping variable `gf` model `m`.
 """
 function ranefinfo(m::LinearMixedModel, gf::Symbol, re=ranef(m))
-    idx = findfirst(==(gf), fnames(m))
-    isnothing(idx) &&
-        throw(ArgumentError("$gf is not the name of a grouping variable in the model"))
+    idx = _group_idx(m, gf)
 
     # XXX replace ranef(m)[idx] with ranef(m, gf) when that becomes available upstream
     re, eff, cv = m.reterms[idx], re[idx], condVar(m, gf)

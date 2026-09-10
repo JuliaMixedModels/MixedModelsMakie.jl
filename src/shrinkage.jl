@@ -135,8 +135,7 @@ The mutating method returns the original object.
 function shrinkageplot!(f::Indexable,
                         m::MixedModel{T},
                         gf::Symbol=first(fnames(m)),
-                        θref::AbstractVector{T}=(isa(m, LinearMixedModel) ? 1e4 : 1) .*
-                                                m.optsum.initial;
+                        θref::AbstractVector{T}=_ref_theta(m);
                         ellipse::Bool=false, ellipse_scale::Real=1,
                         n_ellipse::Integer=5,
                         cols::Union{Nothing,AbstractVector}=nothing,
@@ -144,10 +143,7 @@ function shrinkageplot!(f::Indexable,
                         ellipse_color=:green, ellipse_linestyle=:dash,
                         labels::Union{Bool,Symbol,AbstractVector}=false,
                         labelcolor=:black, labelsize=10, n_labels::Integer=5) where {T}
-    reind = findfirst(==(gf), fnames(m))  # convert the symbol gf to an index
-    if isnothing(reind)
-        throw(ArgumentError("gf=$gf is not one of the grouping factor names, $(fnames(m))"))
-    end
+    reind = _group_idx(m, gf)
     r = m.reterms[reind]
     user_specified_single = !isnothing(cols) && length(cols) == 1
     cols = something(cols, axes(r.cnames, 1))

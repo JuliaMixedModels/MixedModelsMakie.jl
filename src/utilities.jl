@@ -68,9 +68,11 @@ function _coefnames(x::MixedModelBootstrap, ptype; show_intercept=true, group=no
 end
 
 _cols_to_idx(::Vector{String}, cols) = cols
+
 function _cols_to_idx(cnames::Vector{String}, cols::AbstractVector{<:Symbol})
     return _cols_to_idx(cnames, string.(cols))
 end
+
 function _cols_to_idx(cnames::Vector{String}, cols::Vector{<:AbstractString})
     idx = [findfirst(==(c), cnames) for c in cols]
     if any(isnothing, idx)
@@ -172,6 +174,18 @@ function _extract_title!(ax::Axis, kwargs)::Base.Pairs
         kwargs = NamedTuple((k => v for (k, v) in kwargs if k != :title))
     end
     return Base.pairs(kwargs)
+end
+
+"""
+$(TYPEDSIGNATURES)
+
+Return the index of the random effects term associated with the grouping variable `gf`.     
+"""
+function _group_idx(m::MixedModel, gf::Symbol)::Integer
+    idx = findfirst(==(gf), fnames(m))
+    isnothing(idx) &&
+        throw(ArgumentError("$gf is not the name of a grouping variable in the model"))
+    return idx
 end
 
 """
@@ -278,6 +292,16 @@ end
 Return a sequence of `n` equally-spaced points in the interval (0, 1) - so-called "probability points"
 """
 ppoints(n::Integer) = inv(2n):inv(n):1
+
+"""
+    _ref_theta(m::MixedModel)
+
+Provide a reference value for theta that should correspond to a fit without shrinkage.
+
+For linear mixed models, this "unshrunk" fit should be approximately equal to an OLS fit.
+"""
+_ref_theta(m::MixedModel{T}) where {T} = m.optsum.initial
+_ref_theta(m::LinearMixedModel{T}) where {T} = 1e4 .* m.optsum.initial
 
 """
     _StepCurve(x, density)
