@@ -5,20 +5,25 @@ Information on random effects conditional modes/means, variances, etc.
 
 Used for creating caterpillar plots.
 
-!!! note
-    This functionality may be moved upstream into MixedModels.jl in the near future.
+# Fields
+
+$(TYPEDFIELDS)
 """
 struct RanefInfo{T<:AbstractFloat}
+    """Column names, i.e. predictor coefficient names"""
     cnames::Vector{String}
+    """Levels of the random effect, i.e. group names"""
     levels::Vector
+    """Conditional modes (or means) of the random effects"""
     ranef::Matrix{T}
+    """Conditional standard deviations of the random effects"""
     stddev::Matrix{T}
 end
 
 """
     ranefinfo(m::MixedModel)
 
-Return a `NamedTuple{fnames(m), NTuple(k, RanefInfo)}` from model `m`
+Return a `NamedTuple{fnames(m), NTuple{k, RanefInfo}}` from model `m`
 """
 function ranefinfo(m::MixedModel{T}) where {T}
     fn = fnames(m)
@@ -31,9 +36,11 @@ function ranefinfo(m::MixedModel{T}) where {T}
 end
 
 """
-    ranefinfo(m::MixedModel, gf::Symbol)
+    ranefinfo(m::LinearMixedModel, gf::Symbol, re=ranef(m))
 
-Return a `RanefInfo` corresponding to the grouping variable `gf` model `m`.
+Return a `RanefInfo` corresponding to the grouping variable `gf` in model `m`.
+
+The optional `re` argument is a precomputed `ranef(m)` result, used to avoid recomputation.
 """
 function ranefinfo(m::LinearMixedModel, gf::Symbol, re=ranef(m))
     idx = _group_idx(m, gf)
@@ -52,8 +59,10 @@ end
 
 """
     ranefinfotable(ri::RanefInfo)
+    ranefinfotable(ris::NamedTuple)
+    ranefinfotable(m::MixedModel, args...; kwargs...)
 
-Return the information in `ri` as a column table (`NamedTuple` of `Vector`s)
+Return the information in `ri` (or derived from `m`) as a column table (`NamedTuple` of `Vector`s)
 
 The columns are
 
@@ -62,6 +71,11 @@ The columns are
 - `cmode`: conditional mode of the random effect
 - `cstddev`: conditional standard deviation of the random effect
 
+When called with a `NamedTuple` (as returned by [`ranefinfo(m::MixedModel)`](@ref)),
+a `group` column is prepended containing the grouping factor name for each row.
+
+The `MixedModel` method is a convenience wrapper equivalent to
+`ranefinfotable(ranefinfo(m, args...; kwargs...))`.
 """
 function ranefinfotable(ri::RanefInfo)
     cnames, levels = ri.cnames, ri.levels

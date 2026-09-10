@@ -228,9 +228,12 @@ struct ShrinkageInfo{T<:AbstractFloat}
 end
 
 """
-    shrinkageinfo(m::MixedModel)
+    shrinkageinfo(m::MixedModel, θref::Vector{<:AbstractFloat}=_ref_theta(m))
 
-Return a `NamedTuple{fnames(m), NTuple(k, ShrinkageInfo)}` from model `m`
+Return a `NamedTuple{fnames(m), NTuple{k, ShrinkageInfo}}` from model `m`
+
+The optional `θref` argument is the θ vector at which to compute the reference (unshrunken) estimates;
+it defaults to `_ref_theta(m)`.
 """
 function shrinkageinfo(m::MixedModel{T},
                        θref::Vector{<:AbstractFloat}=_ref_theta(m)) where {T}
@@ -245,9 +248,12 @@ function shrinkageinfo(m::MixedModel{T},
 end
 
 """
-    shrinkageinfo(m::MixedModel, gf::Symbol)
+    shrinkageinfo(m::MixedModel, gf::Symbol, θref::Vector{<:AbstractFloat}=_ref_theta(m))
 
-Return a `Shrinkageinfo` corresponding to the grouping variable `gf` model `m`.
+Return a `ShrinkageInfo` corresponding to the grouping variable `gf` in model `m`.
+
+The optional `θref` argument is the θ vector at which to compute the reference (unshrunken) estimates;
+it defaults to `_ref_theta(m)`.
 """
 function shrinkageinfo(m::MixedModel, gf::Symbol,
                        θref::Vector{<:AbstractFloat}=_ref_theta(m))
@@ -272,20 +278,26 @@ function shrinkageinfo(m::GeneralizedLinearMixedModel, args...; kwargs...)
 end
 
 """
-    shrinkageinfotable(si::Shrinkageinfo)
+    shrinkageinfotable(si::ShrinkageInfo)
+    shrinkageinfotable(sis::NamedTuple)
+    shrinkageinfotable(m::MixedModel, args...; kwargs...)
 
-Return the information in `si` as a column table (`NamedTuple` of `Vector`s)
+Return the information in `si` (or derived from `m`) as a column table (`NamedTuple` of `Vector`s)
 
 The columns are
 
 - `name`: name of the random effect
 - `level`: level of the grouping factor
 - `cmode`: conditional mode of the random effect
-- `rmode`: reference mode of the random effect, 
-           corresponding to the conditional mode evaluated at
-           the reference value of θ. Typically, this approximates
-           the value you would get without any shrinkage, e.g. from
-           classical within-groups (non-mixed) regression
+- `rmode`: reference mode of the random effect, corresponding to the conditional mode evaluated at
+           the reference value of θ. Typically, this approximates the value you would get without
+           any shrinkage, e.g. from classical within-groups (non-mixed) regression
+
+When called with a `NamedTuple` (as returned by [`shrinkageinfo(m::MixedModel)`](@ref)),
+a `group` column is prepended containing the grouping factor name for each row.
+
+The `MixedModel` method is a convenience wrapper equivalent to
+`shrinkageinfotable(shrinkageinfo(m, args...; kwargs...))`.
 """
 function shrinkageinfotable(si::ShrinkageInfo)
     cnames, levels = si.cnames, si.levels

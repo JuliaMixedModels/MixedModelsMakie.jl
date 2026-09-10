@@ -75,6 +75,10 @@ ranefinfo
 ```
 
 ```@docs
+ranefinfotable
+```
+
+```@docs
 caterpillar
 ```
 
@@ -131,6 +135,18 @@ qqcaterpillar!(Figure(; size=(400,300)), subjre; cols=[:days])
 ```
 
 ### Shrinkage Plots
+
+```@docs
+ShrinkageInfo
+```
+
+```@docs
+shrinkageinfo
+```
+
+```@docs
+shrinkageinfotable
+```
 
 ```@docs
 shrinkageplot
