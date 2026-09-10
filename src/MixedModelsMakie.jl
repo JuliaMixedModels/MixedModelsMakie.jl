@@ -3,6 +3,7 @@ module MixedModelsMakie
 using BSplineKit
 using LinearAlgebra
 using DataFrames
+using DocStringExtensions
 using Distributions
 using KernelDensity
 using Makie
