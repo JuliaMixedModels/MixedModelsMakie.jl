@@ -300,3 +300,16 @@ ppoints(n::Integer) = inv(2n):inv(n):1
 Evaluate `quantile(Normal(), x)` using only the `SpecialFunctions` package (i.e. not requiring `Distributions`).
 """
 zquantile(x::T) where {T<:Real} = -erfcinv(2x) * sqrt(T(2))
+
+_cols_to_idx(::Vector{String}, cols) = cols
+function _cols_to_idx(cnames::Vector{String}, cols::AbstractVector{<:Symbol})
+    return _cols_to_idx(cnames, string.(cols))
+end
+function _cols_to_idx(cnames::Vector{String}, cols::Vector{<:AbstractString})
+    idx = [findfirst(==(c), cnames) for c in cols]
+    if any(isnothing, idx)
+        misses = cols[isnothing.(idx)]
+        throw(ArgumentError("Specified columns not found in random effects: $(misses)"))
+    end
+    return idx
+end
