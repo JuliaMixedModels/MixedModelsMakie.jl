@@ -312,7 +312,7 @@ function shrinkageplot!(f::Indexable,
         _cols_to_idx(labelnames, string.(labels))
     else
         throw(ArgumentError("Unsupported value for `labels`: $(labels). Use `true`, " *
-                            "`false`, `:auto`, or a vector of level names/indices."))    
+                            "`false`, `:auto`, or a vector of level names/indices."))
     end
 
     splomaxes!(f, cnames, _shrinkage_panel!,

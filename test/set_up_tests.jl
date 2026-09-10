@@ -21,7 +21,7 @@ function save(path, obj, args...; kwargs...)
 end
 
 sleepnum = DataFrame(MixedModels.dataset(:sleepstudy))
-transform!(sleepnum, 
+transform!(sleepnum,
            :subj => ByRow(s -> parse(Int, @view s[2:end])) => :subj)
 m0 = fit(MixedModel,
          @formula(1000 / reaction ~ 1 + days + (1 | subj)),
@@ -29,7 +29,7 @@ m0 = fit(MixedModel,
 
 m1 = fit(MixedModel,
          @formula(1000 / reaction ~ 1 + days + (1 + days | subj)),
-         sleepnum; progress)    
+         sleepnum; progress)
 
 m1_speed = fit(MixedModel,
                @formula(1000 / reaction ~ 1 + days + (1 + days | subj)),
