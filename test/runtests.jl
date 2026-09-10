@@ -1,4 +1,4 @@
-include("setup_tests.jl")
+include("set_up_tests.jl")
 
 @testset ExtendedTestSet "MixedModelsMakie.jl" begin
     @testset "Aqua" begin
