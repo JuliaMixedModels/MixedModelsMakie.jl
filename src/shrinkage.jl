@@ -203,7 +203,7 @@ function _shrinkage_panel!(ax::Axis, i::Int, j::Int, reref, reest, λ;
     plt = scatter!(ax, u, v; color=shrunk_dotcolor)  # conditional means at estimates
     if !isempty(label_idx)
         text!(ax, view(x, label_idx), view(y, label_idx);
-              text=labelnames, color=labelcolor, fontsize=labelsize,
+              text=view(labelnames, label_idx), color=labelcolor, fontsize=labelsize,
               offset=(4, 4))
     end
     if ellipse
@@ -300,6 +300,7 @@ function shrinkageplot!(f::Indexable,
     reref = view(si.blimps, :, cols)
     λ = view(si.λ, cols, cols)
     cnames = view(si.cnames, cols)
+    labelnames = string.(si.levels)
 
     label_idx = if labels === false
         Int[]
@@ -307,13 +308,12 @@ function shrinkageplot!(f::Indexable,
         collect(axes(si.levels, 1))
     elseif labels === :auto
         _auto_label_idx(reest, n_labels)
-    elseif labels isa Symbol
+    elseif labels isa AbstractVector
+        _cols_to_idx(labelnames, string.(labels))
+    else
         throw(ArgumentError("Unsupported value for `labels`: $(labels). Use `true`, " *
                             "`false`, `:auto`, or a vector of level names/indices."))
-    else
-        _cols_to_idx(si.levels, labels)
     end
-    labelnames = si.levels[label_idx]
 
     splomaxes!(f, cnames, _shrinkage_panel!,
                reref, reest, λ; ellipse, ellipse_scale, n_ellipse,
