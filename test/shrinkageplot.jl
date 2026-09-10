@@ -16,10 +16,10 @@ f = shrinkageplot(m2; ellipse=true, cols=["spkr: old", "prec: maintain", "(Inter
 @test_throws(ArgumentError("You only specified a single column. You need at least two."),
              shrinkageplot(m2; ellipse=true, cols=["spkr: old"]))
 
-@test_throws(ArgumentError("Grouping variable (\"subj\") only has a single predictor associated with it (\"(Intercept)\"). You need at least two."),
+@test_throws(ArgumentError("Random effect grouping only has a single predictor associated with it (\"(Intercept)\"). You need at least two."),
              shrinkageplot(m2int; ellipse=false))
 
-@test_throws(ArgumentError("Grouping variable (\"item\") only has a single predictor associated with it (\"(Intercept)\"). You need at least two."),
+@test_throws(ArgumentError("Random effect grouping only has a single predictor associated with it (\"(Intercept)\"). You need at least two."),
              shrinkageplot(m2int, :item))
 
 f = shrinkageplot(m2; ellipse=true, ellipse_scale=2)
@@ -49,3 +49,28 @@ f = shrinkageplot(m2, :item; labels=:auto, n_labels=3)
 @test_throws(ArgumentError("Unsupported value for `labels`: bogus. Use `true`, `false`, " *
                            "`:auto`, or a vector of level names/indices."),
              shrinkageplot(m1; labels=:bogus))
+
+si = shrinkageinfo(m1, :subj)
+f = shrinkageplot(si; ellipse=true)
+@test save(joinpath(OUTDIR, "shrinkage_sleepstudy_from_info.png"), f)
+
+f = shrinkagedot(m1)
+@test save(joinpath(OUTDIR, "shrinkagedot_sleepstudy.png"), f)
+
+f = shrinkagedot(m2, :subj; orderby=Symbol("(Intercept)"))
+@test save(joinpath(OUTDIR, "shrinkagedot_kb07_subj_orderby_name.png"), f)
+
+f_int = shrinkagedot(m2, :subj; orderby=1)
+@test save(joinpath(OUTDIR, "shrinkagedot_kb07_subj_orderby_idx.png"), f_int)
+
+f = shrinkagedot(m2, :subj; orderby="prec: maintain", cols=["load: yes", "prec: maintain"])
+@test save(joinpath(OUTDIR, "shrinkagedot_kb07_subj_orderby_name_string.png"), f)
+
+f = shrinkagedot(m1; orderby=nothing)
+@test save(joinpath(OUTDIR, "shrinkagedot_sleepstudy_unordered.png"), f)
+
+f = shrinkagedot(m1; ordertype=:ref)
+@test save(joinpath(OUTDIR, "shrinkagedot_sleepstudy_orderby_ref.png"), f)
+
+@test_throws(ArgumentError("ordertype must be :shrunk or :ref, got :bogus"),
+             shrinkagedot(m1; ordertype=:bogus))

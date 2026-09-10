@@ -3,6 +3,7 @@ module MixedModelsMakie
 using BSplineKit
 using LinearAlgebra
 using DataFrames
+using DocStringExtensions
 using Distributions
 using KernelDensity
 using Makie
@@ -17,6 +18,7 @@ using StatsModels: StatsModels, CategoricalTerm, terms
 using MixedModels: fit
 
 export RanefInfo,
+       ShrinkageInfo,
        caterpillar,
        caterpillar!,
        clevelandaxes!,
@@ -39,6 +41,10 @@ export RanefInfo,
        ridge2d!,
        ridgeplot,
        ridgeplot!,
+       shrinkagedot,
+       shrinkagedot!,
+       shrinkageinfo,
+       shrinkageinfotable,
        shrinkageplot,
        shrinkageplot!,
        simplelinreg,

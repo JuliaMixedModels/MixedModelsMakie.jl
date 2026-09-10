@@ -75,6 +75,10 @@ ranefinfo
 ```
 
 ```@docs
+ranefinfotable
+```
+
+```@docs
 caterpillar
 ```
 
@@ -133,6 +137,22 @@ qqcaterpillar!(Figure(; size=(400,300)), subjre; cols=[:days])
 ### Shrinkage Plots
 
 ```@docs
+ShrinkageInfo
+```
+
+```@docs
+shrinkageinfo
+```
+
+```@docs
+shrinkageinfotable
+```
+
+```@docs
+shrinkagedot
+```
+
+```@docs
 shrinkageplot
 ```
 
@@ -147,7 +167,7 @@ sleepstudy = MixedModels.dataset(:sleepstudy)
 verbagg = MixedModels.dataset(:verbagg)
 
 fm1 = fit(MixedModel, @formula(reaction ~ 1 + days + (1 + days|subj)), sleepstudy; progress=false)
-shrinkageplot(fm1)
+shrinkageplot(fm1; labels=true)
 ```
 
 ```@example Shrinkage
@@ -155,7 +175,15 @@ shrinkageplot(fm1; ellipse=true)
 ```
 
 ```@example Shrinkage
-shrinkageplot!(Figure(; size=(400,400)), fm1)
+shrinkageplot!(Figure(; size=(400,400)), fm1; labels=:auto)
+```
+
+```@example Shrinkage
+shrinkagedot(fm1; ordertype=:shrunk)
+```
+
+```@example Shrinkage
+shrinkagedot(fm1; ordertype=:ref)
 ```
 
 ```@example Shrinkage
@@ -166,6 +194,7 @@ gm1 = fit(MixedModel,
           progress=false)
 shrinkageplot(gm1, :item)
 ```
+
 
 ## Diagnostics
 

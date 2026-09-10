@@ -5,20 +5,25 @@ Information on random effects conditional modes/means, variances, etc.
 
 Used for creating caterpillar plots.
 
-!!! note
-    This functionality may be moved upstream into MixedModels.jl in the near future.
+# Fields
+
+$(TYPEDFIELDS)
 """
 struct RanefInfo{T<:AbstractFloat}
+    """Column names, i.e. predictor coefficient names"""
     cnames::Vector{String}
+    """Levels of the random effect, i.e. group names"""
     levels::Vector
+    """Conditional modes (or means) of the random effects"""
     ranef::Matrix{T}
+    """Conditional standard deviations of the random effects"""
     stddev::Matrix{T}
 end
 
 """
     ranefinfo(m::MixedModel)
 
-Return a `NamedTuple{fnames(m), NTuple(k, RanefInfo)}` from model `m`
+Return a `NamedTuple{fnames(m), NTuple{k, RanefInfo}}` from model `m`
 """
 function ranefinfo(m::MixedModel{T}) where {T}
     fn = fnames(m)
@@ -31,14 +36,14 @@ function ranefinfo(m::MixedModel{T}) where {T}
 end
 
 """
-    ranefinfo(m::MixedModel, gf::Symbol)
+    ranefinfo(m::LinearMixedModel, gf::Symbol, re=ranef(m))
 
-Return a `RanefInfo` corresponding to the grouping variable `gf` model `m`.
+Return a `RanefInfo` corresponding to the grouping variable `gf` in model `m`.
+
+The optional `re` argument is a precomputed `ranef(m)` result, used to avoid recomputation.
 """
 function ranefinfo(m::LinearMixedModel, gf::Symbol, re=ranef(m))
-    idx = findfirst(==(gf), fnames(m))
-    isnothing(idx) &&
-        throw(ArgumentError("$gf is not the name of a grouping variable in the model"))
+    idx = _group_idx(m, gf)
 
     # XXX replace ranef(m)[idx] with ranef(m, gf) when that becomes available upstream
     re, eff, cv = m.reterms[idx], re[idx], condVar(m, gf)
@@ -54,8 +59,10 @@ end
 
 """
     ranefinfotable(ri::RanefInfo)
+    ranefinfotable(ris::NamedTuple)
+    ranefinfotable(m::MixedModel, args...; kwargs...)
 
-Return the information in `ri` as a column table (`NamedTuple` of `Vector`s)
+Return the information in `ri` (or derived from `m`) as a column table (`NamedTuple` of `Vector`s)
 
 The columns are
 
@@ -64,6 +71,11 @@ The columns are
 - `cmode`: conditional mode of the random effect
 - `cstddev`: conditional standard deviation of the random effect
 
+When called with a `NamedTuple` (as returned by [`ranefinfo(m::MixedModel)`](@ref)),
+a `group` column is prepended containing the grouping factor name for each row.
+
+The `MixedModel` method is a convenience wrapper equivalent to
+`ranefinfotable(ranefinfo(m, args...; kwargs...))`.
 """
 function ranefinfotable(ri::RanefInfo)
     cnames, levels = ri.cnames, ri.levels
@@ -74,6 +86,21 @@ function ranefinfotable(ri::RanefInfo)
             level=repeat(levels; outer=k),
             cmode=vec(ri.ranef),
             cstddev=vec(ri.stddev))
+end
+
+function ranefinfotable(ris::NamedTuple)
+    rowtable = mapreduce(vcat, propertynames(ris), values(ris)) do grpname, ri
+        table = ranefinfotable(ri)
+        table = merge((; group=fill(grpname, length(table.name))),
+                      table)
+        return Tables.rowtable(table)
+    end
+
+    return Tables.columntable(rowtable)
+end
+
+function ranefinfotable(m::MixedModel, args...; kwargs...)
+    return ranefinfotable(ranefinfo(m, args...; kwargs...))
 end
 
 """
@@ -96,8 +123,8 @@ Constructing `RanefInfo` directly can be used to avoid re-computing the conditio
 
 The order of the levels on the vertical axes is increasing `orderby` column
 of `r.ranef`, usually the `(Intercept)` random effects.
-Setting `orderby=nothing` will disable sorting, i.e. return the levels in the
-order they are stored in.
+`orderby` can be an integer column index, a column name (as a `Symbol` or `String`), or `nothing` to disable sorting.
+Setting `orderby=nothing` returns the levels in the order they are stored in.
 
 The display can be restricted to a subset of random effects associated with a grouping variable by
 specifying `cols`, either by indices or term names.
@@ -111,7 +138,8 @@ The mutating methods return the original object.
     calling `caterpillar!`.
 
 !!! note
-    `orderby` is the ``n``th column of the columns specified by `cols`.
+    When `orderby` is specified as a column name (Symbol or String), it refers to a column
+    within those specified by `cols`, not the full set of random effects coefficients.
 """
 function caterpillar!(f::Indexable, r::RanefInfo;
                       orderby=1, cols::Union{Nothing,AbstractVector}=nothing,
@@ -123,6 +151,7 @@ function caterpillar!(f::Indexable, r::RanefInfo;
     sd = view(r.stddev, :, cols)
     cn = view(r.cnames, cols)
     y = axes(rr, 1)
+    orderby = _resolve_orderby(cn, orderby)
     ord = isnothing(orderby) ? y : sortperm(view(rr, :, orderby))
     axs = [Axis(f[1, j]) for j in axes(rr, 2)]
     linkyaxes!(axs...)
@@ -207,17 +236,4 @@ end
 """$(@doc qqcaterpillar!)"""
 function qqcaterpillar(m::MixedModel, gf::Symbol=first(fnames(m)); kwargs...)
     return qqcaterpillar!(Figure(; size=(1000, 800)), m, gf; kwargs...)
-end
-
-_cols_to_idx(::Vector{String}, cols) = cols
-function _cols_to_idx(cnames::Vector{String}, cols::AbstractVector{<:Symbol})
-    return _cols_to_idx(cnames, string.(cols))
-end
-function _cols_to_idx(cnames::Vector{String}, cols::Vector{<:AbstractString})
-    idx = [findfirst(==(c), cnames) for c in cols]
-    if any(isnothing, idx)
-        misses = cols[isnothing.(idx)]
-        throw(ArgumentError("Specified columns not found in random effects: $(misses)"))
-    end
-    return idx
 end
