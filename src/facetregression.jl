@@ -72,7 +72,8 @@ function facetregressioninfo(data, response::Union{Symbol,AbstractString},
         push!(intercept, a)
         push!(slope, b)
     end
-    return FacetRegressionInfo(group, predictor, response, labels, x, y, n, intercept, slope,
+    return FacetRegressionInfo(group, predictor, response, labels, x, y, n, intercept,
+                               slope,
                                (minimum(xall), maximum(xall)),
                                (minimum(yall), maximum(yall)),
                                nothing, nothing, nothing)
@@ -149,7 +150,8 @@ function facetregressioninfo(m::LinearMixedModel, predictor::Union{Symbol,Abstra
         :response
     end
 
-    return FacetRegressionInfo(group, Symbol(predictor), response, labels, x, y, n, intercept,
+    return FacetRegressionInfo(group, Symbol(predictor), response, labels, x, y, n,
+                               intercept,
                                slope, (minimum(xall), maximum(xall)),
                                (minimum(yall), maximum(yall)), (a_pop, b_pop),
                                shrunken_intercept, shrunken_slope)
@@ -176,7 +178,8 @@ function _facetregression_default_predictor(m::LinearMixedModel)
     return only(candidates)
 end
 
-function _facetregression_order(info::FacetRegressionInfo, orderby::Union{Symbol,Nothing}; rev::Bool=false)
+function _facetregression_order(info::FacetRegressionInfo, orderby::Union{Symbol,Nothing};
+                                rev::Bool=false)
     perm = if orderby === nothing
         collect(eachindex(info.labels))
     elseif orderby === :intercept
@@ -469,17 +472,19 @@ The `data`/`m`-based methods are convenience wrappers equivalent to
     design (e.g. the `LinearMixedModel` columns) may change in minor releases
     without being treated as breaking.
 """
-function facetregressioninfotable(info::FacetRegressionInfo; orderby::Union{Symbol,Nothing}=nothing,
+function facetregressioninfotable(info::FacetRegressionInfo;
+                                  orderby::Union{Symbol,Nothing}=nothing,
                                   rev::Bool=false)
     perm = _facetregression_order(info, orderby; rev)
     cols = (; group=info.labels[perm], n=info.n[perm],
             intercept=info.intercept[perm], slope=info.slope[perm])
     if info.fixef !== nothing
         a_pop, b_pop = info.fixef
-        cols = merge(cols, (; fixef_intercept=fill(a_pop, length(perm)),
-                            fixef_slope=fill(b_pop, length(perm)),
-                            shrunken_intercept=info.shrunken_intercept[perm],
-                            shrunken_slope=info.shrunken_slope[perm]))
+        cols = merge(cols,
+                     (; fixef_intercept=fill(a_pop, length(perm)),
+                      fixef_slope=fill(b_pop, length(perm)),
+                      shrunken_intercept=info.shrunken_intercept[perm],
+                      shrunken_slope=info.shrunken_slope[perm]))
     end
     return DataFrame(; cols...)
 end
@@ -492,7 +497,8 @@ function facetregressioninfotable(data, response::Union{Symbol,AbstractString},
     return facetregressioninfotable(info; orderby, rev)
 end
 
-function facetregressioninfotable(m::LinearMixedModel, predictor::Union{Symbol,AbstractString},
+function facetregressioninfotable(m::LinearMixedModel,
+                                  predictor::Union{Symbol,AbstractString},
                                   group::Union{Symbol,AbstractString}=first(fnames(m));
                                   orderby::Union{Symbol,Nothing}=nothing, rev::Bool=false)
     info = facetregressioninfo(m, predictor, group)
