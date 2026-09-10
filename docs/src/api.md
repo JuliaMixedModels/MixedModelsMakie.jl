@@ -167,7 +167,7 @@ sleepstudy = MixedModels.dataset(:sleepstudy)
 verbagg = MixedModels.dataset(:verbagg)
 
 fm1 = fit(MixedModel, @formula(reaction ~ 1 + days + (1 + days|subj)), sleepstudy; progress=false)
-shrinkageplot(fm1)
+shrinkageplot(fm1; labels=true)
 ```
 
 ```@example Shrinkage
@@ -175,7 +175,7 @@ shrinkageplot(fm1; ellipse=true)
 ```
 
 ```@example Shrinkage
-shrinkageplot!(Figure(; size=(400,400)), fm1)
+shrinkageplot!(Figure(; size=(400,400)), fm1; labels=:auto)
 ```
 
 ```@example Shrinkage
