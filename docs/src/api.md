@@ -149,6 +149,10 @@ shrinkageinfotable
 ```
 
 ```@docs
+shrinkagedot
+```
+
+```@docs
 shrinkageplot
 ```
 
@@ -175,6 +179,14 @@ shrinkageplot!(Figure(; size=(400,400)), fm1)
 ```
 
 ```@example Shrinkage
+shrinkagedot(fm1; ordertype=:shrunk)
+```
+
+```@example Shrinkage
+shrinkagedot(fm1; ordertype=:ref)
+```
+
+```@example Shrinkage
 gm1 = fit(MixedModel,
           @formula(r2 ~ 1 + anger + gender + btype + situ + (1|subj) + (1+gender|item)),
           verbagg,
@@ -182,6 +194,7 @@ gm1 = fit(MixedModel,
           progress=false)
 shrinkageplot(gm1, :item)
 ```
+
 
 ## Diagnostics
 
