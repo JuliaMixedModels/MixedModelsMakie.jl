@@ -370,7 +370,7 @@ function shrinkagedot!(f::Indexable, r::ShrinkageInfo;
                        # TODO: allow orderby to be specified as a name
                        orderby=1, cols::Union{Nothing,AbstractVector}=nothing,
                        ordertype=:shrunk,
-                       shrunk_dotcolor=(:blue, 0.25), 
+                       shrunk_dotcolor=(:blue, 0.25),
                        ref_dotcolor=(:red, 0.25),
                        arrowcolor=:black,
                        vline_at_zero::Bool=false)
@@ -382,7 +382,7 @@ function shrinkagedot!(f::Indexable, r::ShrinkageInfo;
     y = axes(blups, 1)
     # TODO: check for invalid input 
     # we want to restrict this to :shrunk and :ref
-    orderer = ordertype === :shrunk ? blups : blimps 
+    orderer = ordertype === :shrunk ? blups : blimps
     ord = isnothing(orderby) ? y : sortperm(view(orderer, :, orderby))
     axs = [Axis(f[1, j]) for j in axes(blups, 2)]
     linkyaxes!(axs...)
@@ -405,7 +405,7 @@ function shrinkagedot!(f::Indexable, r::ShrinkageInfo;
 end
 
 function shrinkagedot!(f::Indexable, m::MixedModel,
-                      gf::Symbol=first(fnames(m)); kwargs...)
+                       gf::Symbol=first(fnames(m)); kwargs...)
     return shrinkagedot!(f, shrinkageinfo(m, gf); kwargs...)
 end
 
