@@ -300,6 +300,7 @@ function shrinkageplot!(f::Indexable,
     reref = view(si.blimps, :, cols)
     λ = view(si.λ, cols, cols)
     cnames = view(si.cnames, cols)
+    labelnames = string.(si.levels)
 
     label_idx = if labels === false
         Int[]
@@ -307,13 +308,12 @@ function shrinkageplot!(f::Indexable,
         collect(axes(si.levels, 1))
     elseif labels === :auto
         _auto_label_idx(reest, n_labels)
-    elseif labels isa Symbol
-        throw(ArgumentError("Unsupported value for `labels`: $(labels). Use `true`, " *
-                            "`false`, `:auto`, or a vector of level names/indices."))
+    elseif labels isa AbstractVector
+        _cols_to_idx(labelnames, string.(labels))
     else
-        _cols_to_idx(si.levels, labels)
+        throw(ArgumentError("Unsupported value for `labels`: $(labels). Use `true`, " *
+                            "`false`, `:auto`, or a vector of level names/indices."))    
     end
-    labelnames = si.levels[label_idx]
 
     splomaxes!(f, cnames, _shrinkage_panel!,
                reref, reest, λ; ellipse, ellipse_scale, n_ellipse,
