@@ -81,6 +81,7 @@ include("xyplot.jl")
 include("facetregression.jl")
 include("recipes.jl")
 include("upset.jl")
+include("deprecate.jl")
 
 @setup_workload begin
     model = fit(MixedModel, @formula(reaction ~ 1 + days + (1 + days | subj)),

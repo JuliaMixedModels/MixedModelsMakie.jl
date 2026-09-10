@@ -180,7 +180,7 @@ end
 
 function _facetregression_order(info::FacetRegressionInfo, orderby::Union{Symbol,Nothing};
                                 rev::Bool=false)
-    perm = if orderby === nothing
+    perm = if orderby === nothing || orderby === :none # XXX legacy behavior
         collect(eachindex(info.labels))
     elseif orderby === :intercept
         sortperm(info.intercept)
@@ -438,15 +438,15 @@ function facetregression(info::FacetRegressionInfo; kwargs...)
 end
 
 """
-    facetregressioninfotable(info::FacetRegressionInfo; orderby::Union{Symbol,Nothing}=nothing, rev::Bool=false)::DataFrame
-    facetregressioninfotable(data, response, predictor, group; orderby::Union{Symbol,Nothing}=nothing, rev::Bool=false)::DataFrame
+    facetregressioninfotable(info::FacetRegressionInfo; orderby::Union{Symbol,Nothing}=nothing, rev::Bool=false)
+    facetregressioninfotable(data, response, predictor, group; orderby::Union{Symbol,Nothing}=nothing, rev::Bool=false)
     facetregressioninfotable(m::LinearMixedModel, predictor, group=first(fnames(m));
-                             orderby::SUnion{Symbol,Nothing}=nothing, rev::Bool=false)::DataFrame
+                             orderby::SUnion{Symbol,Nothing}=nothing, rev::Bool=false)
     facetregressioninfotable(m::LinearMixedModel; group=first(fnames(m)),
-                             orderby::Union{Symbol,Nothing}=nothing, rev::Bool=false)::DataFrame
+                             orderby::Union{Symbol,Nothing}=nothing, rev::Bool=false)   
 
 Return the per-group OLS fits in `info` (or derived from `data`/`m`) underlying
-[`facetregression!`](@ref) as a `DataFrame`, one row per level of `group`, with
+[`facetregression!`](@ref) as a column table, one row per level of `group`, with
 columns:
 - `group`: the group level
 - `n`: number of observations in that group
@@ -470,7 +470,8 @@ The `data`/`m`-based methods are convenience wrappers equivalent to
 !!! warning "Evolving design"
     `facetregression`/`facetregressioninfotable` are still experimental and their
     design (e.g. the `LinearMixedModel` columns) may change in minor releases
-    without being treated as breaking.
+    without being treated as breaking. Relatedly, the binding `facetregressiontable`
+    is deprecated and may be removed in a future release without being considered breaking.
 """
 function facetregressioninfotable(info::FacetRegressionInfo;
                                   orderby::Union{Symbol,Nothing}=nothing,
@@ -486,7 +487,7 @@ function facetregressioninfotable(info::FacetRegressionInfo;
                       shrunken_intercept=info.shrunken_intercept[perm],
                       shrunken_slope=info.shrunken_slope[perm]))
     end
-    return DataFrame(; cols...)
+    return cols
 end
 
 function facetregressioninfotable(data, response::Union{Symbol,AbstractString},
