@@ -42,7 +42,7 @@ end
 
 @testset "facetregressioninfotable" begin
     ft = facetregressioninfotable(data, :y, :x, :g)
-    @test names(ft) == ["group", "n", "intercept", "slope"]
+    @test Tables.columnnames(ft) == (:group, :n, :intercept, :slope)
     @test nrow(ft) == length(unique(data.g))
     @test all(==(5), ft.n)
 
@@ -66,7 +66,7 @@ end
     lab = first(data.g)
     idx = findall(==(lab), data.g)
     a, b = simplelinreg(data.x[idx], data.y[idx])
-    row = only(filter(:group => ==(lab), ft))
+    row = only(filter(:group => ==(lab), DataFrame(ft)))
     @test row.intercept ≈ a
     @test row.slope ≈ b
 end
@@ -108,9 +108,9 @@ end
 
 @testset "facetregressioninfotable (model)" begin
     ft = facetregressioninfotable(m1, :days)
-    @test names(ft) ==
-          ["group", "n", "intercept", "slope", "fixef_intercept", "fixef_slope",
-           "shrunken_intercept", "shrunken_slope"]
+    @test Tables.columnnames(ft) ==
+          (:group, :n, :intercept, :slope, :fixef_intercept, :fixef_slope,
+           :shrunken_intercept, :shrunken_slope)
     @test nrow(ft) == length(m1.reterms[1].levels)
 
     # nothing preserves the model's own level order, not resorted
