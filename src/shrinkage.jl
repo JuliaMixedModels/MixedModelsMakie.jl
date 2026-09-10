@@ -350,9 +350,9 @@ Constructing `ShrinkageInfo` directly can be used to avoid re-computing the cond
 
 The order of the levels on the vertical axes is increasing `orderby` column
 of `r.blups` (shrunk effects) or `r.blimps` (reference/unshrunken effects), usually the `(Intercept)` random effects.
-Which to sort by is controlled via `ordertype` (`:shrunk` or `:ref`).
-Setting `orderby=nothing` will disable sorting, i.e. return the levels in the
-order they are stored in.
+`orderby` can be an integer column index, a column name (as a `Symbol` or `String`), or `nothing` to disable sorting.
+Which raw values to sort by is controlled via `ordertype` (`:shrunk` for shrunk effects, `:ref` for reference/unshrunken effects).
+Setting `orderby=nothing` returns the levels in the order they are stored in.
 
 The display can be restricted to a subset of random effects associated with a grouping variable by
 specifying `cols`, either by indices or term names.
@@ -366,10 +366,10 @@ The mutating methods return the original object.
     calling `shrinkagedot!`.
 
 !!! note
-    `orderby` is the ``n``th column of the columns specified by `cols`.
+    When `orderby` is specified as a column name (Symbol or String), it refers to a column
+    within those specified by `cols`, not the full set of random effects coefficients.
 """
 function shrinkagedot!(f::Indexable, r::ShrinkageInfo;
-                       # TODO: allow orderby to be specified as a name
                        orderby=1, cols::Union{Nothing,AbstractVector}=nothing,
                        ordertype=:shrunk,
                        shrunk_dotcolor=(:blue, 0.25),
@@ -382,8 +382,9 @@ function shrinkagedot!(f::Indexable, r::ShrinkageInfo;
     blimps = view(r.blimps, :, cols)
     cn = view(r.cnames, cols)
     y = axes(blups, 1)
-    # TODO: check for invalid input 
-    # we want to restrict this to :shrunk and :ref
+    orderby = _resolve_orderby(cn, orderby)
+    ordertype in (:shrunk, :ref) ||
+        throw(ArgumentError("ordertype must be :shrunk or :ref, got :$(ordertype)"))
     orderer = ordertype === :shrunk ? blups : blimps
     ord = isnothing(orderby) ? y : sortperm(view(orderer, :, orderby))
     axs = [Axis(f[1, j]) for j in axes(blups, 2)]

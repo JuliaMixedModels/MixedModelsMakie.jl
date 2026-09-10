@@ -82,6 +82,18 @@ function _cols_to_idx(cnames::Vector{String}, cols::Vector{<:AbstractString})
     return idx
 end
 
+function _resolve_orderby(cn::AbstractVector{<:AbstractString}, orderby::Nothing)
+    return nothing
+end
+
+function _resolve_orderby(cn::AbstractVector{<:AbstractString}, orderby::Integer)
+    return orderby
+end
+
+function _resolve_orderby(cn::AbstractVector{<:AbstractString}, orderby::Union{Symbol,AbstractString})
+    return only(_cols_to_idx(collect(cn), [orderby]))
+end
+
 """
     confint_table(x::MixedModel, level=0.95; show_intercept=true)
     confint_table(x::MixedModelBootstrap, level=0.95; show_intercept=true)

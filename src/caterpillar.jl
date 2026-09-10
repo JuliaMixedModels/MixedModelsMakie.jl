@@ -123,8 +123,8 @@ Constructing `RanefInfo` directly can be used to avoid re-computing the conditio
 
 The order of the levels on the vertical axes is increasing `orderby` column
 of `r.ranef`, usually the `(Intercept)` random effects.
-Setting `orderby=nothing` will disable sorting, i.e. return the levels in the
-order they are stored in.
+`orderby` can be an integer column index, a column name (as a `Symbol` or `String`), or `nothing` to disable sorting.
+Setting `orderby=nothing` returns the levels in the order they are stored in.
 
 The display can be restricted to a subset of random effects associated with a grouping variable by
 specifying `cols`, either by indices or term names.
@@ -138,10 +138,10 @@ The mutating methods return the original object.
     calling `caterpillar!`.
 
 !!! note
-    `orderby` is the ``n``th column of the columns specified by `cols`.
+    When `orderby` is specified as a column name (Symbol or String), it refers to a column
+    within those specified by `cols`, not the full set of random effects coefficients.
 """
 function caterpillar!(f::Indexable, r::RanefInfo;
-                      # TODO allow specifying orderby as a column name
                       orderby=1, cols::Union{Nothing,AbstractVector}=nothing,
                       dotcolor=(:red, 0.2), barcolor=:black,
                       vline_at_zero::Bool=false)
@@ -151,6 +151,7 @@ function caterpillar!(f::Indexable, r::RanefInfo;
     sd = view(r.stddev, :, cols)
     cn = view(r.cnames, cols)
     y = axes(rr, 1)
+    orderby = _resolve_orderby(cn, orderby)
     ord = isnothing(orderby) ? y : sortperm(view(rr, :, orderby))
     axs = [Axis(f[1, j]) for j in axes(rr, 2)]
     linkyaxes!(axs...)
