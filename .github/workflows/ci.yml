@@ -47,7 +47,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Percy Upload
-        if: ${{ matrix.version == 'min' }}
+        if: ${{ matrix.version == 'min' && github.event.pull_request.draft == false}}
         run: |
           ls ./test/output/ # useful for debugging
           npx @percy/cli upload ./test/output
