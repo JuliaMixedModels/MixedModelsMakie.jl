@@ -1,6 +1,6 @@
 name = "MixedModelsMakie"
 uuid = "b12ae82c-6730-437f-aff9-d2c38332a376"
-version = "0.4.20"
+version = "0.4.21"
 authors = ["Phillip Alday <me@phillipalday.com>", "Douglas Bates <dmbates@gmail.com>", "contributors"]
 
 [deps]

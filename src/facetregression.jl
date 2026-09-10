@@ -1,5 +1,58 @@
-function _facetregression_data(df::DataFrame, response::Symbol, predictor::Symbol,
-                               group::Symbol)
+"""
+    FacetRegressionInfo
+
+Per-group data and within-unit OLS fits underlying [`facetregression!`](@ref).
+
+# Fields
+
+$(TYPEDFIELDS)
+"""
+struct FacetRegressionInfo{T<:AbstractFloat}
+    """Name of the grouping variable/factor"""
+    group::Symbol
+    """Name of the predictor (x) variable"""
+    predictor::Symbol
+    """Name of the response (y) variable"""
+    response::Symbol
+    """Group levels, in encounter order"""
+    labels::Vector
+    """Per-group predictor values"""
+    x::Vector{Vector{T}}
+    """Per-group response values"""
+    y::Vector{Vector{T}}
+    """Per-group observation counts"""
+    n::Vector{Int}
+    """Per-group within-unit OLS intercept"""
+    intercept::Vector{T}
+    """Per-group within-unit OLS slope"""
+    slope::Vector{T}
+    """`(min, max)` of the predictor across all groups"""
+    xrange::Tuple{T,T}
+    """`(min, max)` of the response across all groups"""
+    yrange::Tuple{T,T}
+    """Population fixed-effects `(intercept, slope)`; `nothing` for the table-based constructor"""
+    fixef::Union{Nothing,Tuple{T,T}}
+    """Per-group shrunken/BLUP intercept; `nothing` for the table-based constructor"""
+    shrunken_intercept::Union{Nothing,Vector{T}}
+    """Per-group shrunken/BLUP slope; `nothing` for the table-based constructor"""
+    shrunken_slope::Union{Nothing,Vector{T}}
+end
+
+"""
+    facetregressioninfo(data, response, predictor, group)::FacetRegressionInfo
+
+Compute the per-group data and within-unit OLS fits underlying
+[`facetregression!`](@ref) from a Tables.jl-compatible `data` source.
+
+`response`, `predictor`, and `group` are `Symbol` or `AbstractString` column
+names. `fixef`, `shrunken_intercept`, and `shrunken_slope` are `nothing` for
+this table-based method (there is no model to derive them from).
+"""
+function facetregressioninfo(data, response::Union{Symbol,AbstractString},
+                             predictor::Union{Symbol,AbstractString},
+                             group::Union{Symbol,AbstractString})
+    df = DataFrame(data)
+    response, predictor, group = Symbol(response), Symbol(predictor), Symbol(group)
     xall = Float64.(df[!, predictor])
     yall = Float64.(df[!, response])
     gcol = df[!, group]
@@ -19,25 +72,31 @@ function _facetregression_data(df::DataFrame, response::Symbol, predictor::Symbo
         push!(intercept, a)
         push!(slope, b)
     end
-    return (; group, predictor, response, labels, x, y, n, intercept, slope,
-            xrange=(minimum(xall), maximum(xall)),
-            yrange=(minimum(yall), maximum(yall)),
-            fixef=nothing, shrunken_intercept=nothing, shrunken_slope=nothing)
+    return FacetRegressionInfo(group, predictor, response, labels, x, y, n, intercept, slope,
+                               (minimum(xall), maximum(xall)),
+                               (minimum(yall), maximum(yall)),
+                               nothing, nothing, nothing)
 end
 
 """
-    _facetregression_data(m::LinearMixedModel, predictor, group)
+    facetregressioninfo(m::LinearMixedModel, predictor, group=first(fnames(m)))::FacetRegressionInfo
+    facetregressioninfo(m::LinearMixedModel; group=first(fnames(m)))::FacetRegressionInfo
 
-Extract the same per-group data as the table-based method, sourced entirely
+Compute the per-group data and within-unit OLS fits underlying
+[`facetregression!`](@ref) from a fitted `LinearMixedModel`, sourced entirely
 from the model's own matrices (`m.X`, `m.y`, `m.reterms`) rather than a raw
 data table -- see `ranefinfo` (caterpillar.jl) and the co-occurrence
 extraction in nesting.jl for the precedent of using only `ReMat.refs`/`.levels`
 this way. Also populates `fixef` (the population intercept/slope) and, per
 group, `shrunken_intercept`/`shrunken_slope` (fixed effects + that group's
 conditional modes from `ranef(m)`).
+
+`predictor` may be omitted, in which case it defaults to the model's only
+non-intercept fixed-effect term -- this throws an `ArgumentError` if the
+model has more than one such term.
 """
-function _facetregression_data(m::LinearMixedModel, predictor::Union{Symbol,AbstractString},
-                               group::Union{Symbol,AbstractString})
+function facetregressioninfo(m::LinearMixedModel, predictor::Union{Symbol,AbstractString},
+                             group::Union{Symbol,AbstractString}=first(fnames(m)))
     group = Symbol(group)
     gidx = findfirst(==(group), fnames(m))
     gidx === nothing &&
@@ -90,18 +149,25 @@ function _facetregression_data(m::LinearMixedModel, predictor::Union{Symbol,Abst
         :response
     end
 
-    return (; group, predictor=Symbol(predictor), response, labels, x, y, n, intercept,
-            slope, xrange=(minimum(xall), maximum(xall)),
-            yrange=(minimum(yall), maximum(yall)), fixef=(a_pop, b_pop),
-            shrunken_intercept, shrunken_slope)
+    return FacetRegressionInfo(group, Symbol(predictor), response, labels, x, y, n, intercept,
+                               slope, (minimum(xall), maximum(xall)),
+                               (minimum(yall), maximum(yall)), (a_pop, b_pop),
+                               shrunken_intercept, shrunken_slope)
+end
+
+function facetregressioninfo(m::LinearMixedModel;
+                             group::Union{Symbol,AbstractString}=first(fnames(m)))
+    predictor = _facetregression_default_predictor(m)
+    return facetregressioninfo(m, predictor, group)
 end
 
 """
     _facetregression_default_predictor(m::LinearMixedModel)
 
 Return the model's only non-intercept fixed-effect term name, for the
-`facetregression` methods that let `predictor` be omitted. Throws an
-`ArgumentError` if the model doesn't have exactly one such term.
+`facetregressioninfo`/`facetregression` methods that let `predictor` be
+omitted. Throws an `ArgumentError` if the model doesn't have exactly one
+such term.
 """
 function _facetregression_default_predictor(m::LinearMixedModel)
     candidates = filter(!=("(Intercept)"), coefnames(m))
@@ -110,15 +176,15 @@ function _facetregression_default_predictor(m::LinearMixedModel)
     return only(candidates)
 end
 
-function _facetregression_order(info::NamedTuple, orderby::Symbol; rev::Bool=false)
-    perm = if orderby === :none
+function _facetregression_order(info::FacetRegressionInfo, orderby::Union{Symbol,Nothing}; rev::Bool=false)
+    perm = if orderby === nothing
         collect(eachindex(info.labels))
     elseif orderby === :intercept
         sortperm(info.intercept)
     elseif orderby === :slope
         sortperm(info.slope)
     else
-        throw(ArgumentError("orderby must be :none, :intercept, or :slope, got :$orderby"))
+        throw(ArgumentError("orderby must be nothing, :intercept, or :slope, got :$orderby"))
     end
     return rev ? reverse(perm) : perm
 end
@@ -157,22 +223,100 @@ function _facetregression_gridlayout(f::Union{GridPosition,GridSubposition})
     return Makie.contents(f)[idx]
 end
 
-function _facetregression_render!(f::Indexable, info::NamedTuple;
-                                  orderby::Symbol=:none,
-                                  rev::Bool=false,
-                                  layout::Union{Nothing,Tuple{_MaybeInt,_MaybeInt}}=nothing,
-                                  bank45::Bool=true,
-                                  xlabel::AbstractString=string(info.predictor),
-                                  ylabel::AbstractString=string(info.response),
-                                  scattercolor=(:blue, 0.4),
-                                  linecolor=:red,
-                                  show_fixef::Bool=true,
-                                  fixefcolor=:black,
-                                  fixeflinestyle=:dash,
-                                  show_shrunken::Bool=true,
-                                  shrunkencolor=:green,
-                                  labelcolor=:black,
-                                  labelsize=12)
+"""
+    facetregression(data, response, predictor, group; kwargs...)::Figure
+    facetregression!(f::$(Indexable), data, response, predictor, group; kwargs...)
+    facetregression(m::LinearMixedModel, predictor, group=first(fnames(m)); kwargs...)::Figure
+    facetregression!(f::$(Indexable), m::LinearMixedModel, predictor,
+                     group=first(fnames(m)); kwargs...)
+    facetregression(m::LinearMixedModel; group=first(fnames(m)), kwargs...)::Figure
+    facetregression!(f::$(Indexable), m::LinearMixedModel;
+                     group=first(fnames(m)), kwargs...)
+    facetregression(info::FacetRegressionInfo; kwargs...)::Figure
+    facetregression!(f::$(Indexable), info::FacetRegressionInfo; kwargs...)
+
+Create a Cleveland-trellis-style small-multiples display: one panel per level of
+`group`, each showing a scatter of `response` against `predictor` plus that
+group's own OLS regression line.
+
+The table-based methods take `response`, `predictor`, and `group` as `Symbol` or
+`AbstractString` column names into any Tables.jl-compatible `data`.
+
+The `LinearMixedModel`-based methods instead extract everything from the model's
+own matrices — no data table is needed. `predictor` must be the name of a
+continuous fixed-effect term (e.g. `:days`); `group` names a grouping factor and
+defaults to the first one (`first(fnames(m))`). Two extra reference lines are
+drawn in every panel: the population-level fixed-effects fit (`show_fixef`,
+the same line in every panel) and that group's own shrunken/BLUP fit
+`(`show_shrunken`).
+
+`predictor` may be omitted entirely (note `group` then becomes keyword-only, to
+avoid ambiguity with the `predictor` positional argument), in which case it
+defaults to the model's only non-intercept fixed-effect term — this throws an
+`ArgumentError` if the model has more than one such term.
+
+Alternatively, [`facetregressioninfo`](@ref) may be used to construct the
+`FacetRegressionInfo` object directly. Constructing it directly can be used to
+avoid re-computing the per-group OLS fits (and, for a model source, `fixef`/
+`ranef`) when generating multiple plots (e.g. with different `layout` or
+`bank45` settings) from the same data.
+
+All panels share linked x/y axes (Cleveland-trellis convention), so slopes and
+scatter remain visually comparable across panels.
+
+!!! warning "Evolving design"
+    `facetregression` is still experimental. The keyword set (e.g. the
+    `LinearMixedModel` overlay colors/lines, banking behavior) may change in
+    minor releases without being treated as breaking.
+
+# Keywords
+- `orderby::Union{Symbol,Nothing}=nothing` panel order — `nothing` preserves the order groups are
+  first encountered (not alphabetical), `:intercept`/`:slope` sort by the
+  group's own within-unit OLS fit.
+- `rev::Bool=false`: reverse the panel order produced by `orderby` (applied
+  after sorting, so it also reverses `nothing`'s first-encountered order).
+- `layout::Union{Nothing,Tuple{Union{Nothing,Int},Union{Nothing,Int}}}=nothing`:
+  `(nrow, ncol)` grid shape. `nothing` auto-computes a roughly square grid.
+  Either element may be `nothing` to auto-compute just that one from the
+  other (e.g. `layout=(2, nothing)` fixes 2 rows and picks enough columns to
+  fit every group). If both are given and their product is smaller than the
+  number of groups, the grid is used as given (never enlarged) and a warning
+  reports how many trailing groups are left undisplayed.
+- `bank45::Bool=true`: shape the grid columns (via `colsize!` with a
+  `GridLayoutBase.Aspect` size) so that a line with the *mean* of the
+  per-group within-unit OLS slopes appears at 45° on screen ("banking", after
+  Cleveland's trellis displays), easing visual comparison of slopes across
+  panels. Full data is always shown — banking reshapes the panels, it never
+  clips data. `bank45=false` leaves panels at their natural (roughly square)
+  shape.
+- `xlabel`/`ylabel`: shared axis titles spanning the whole grid (default to the
+  `predictor`/`response` names).
+- `scattercolor`, `linecolor`: per-panel scatter and within-unit regression-line
+  colors.
+- `show_fixef::Bool=true`, `fixefcolor=:black`, `fixeflinestyle=:dash`: whether
+  to draw the population fixed-effects line (`LinearMixedModel` source only).
+- `show_shrunken::Bool=true`, `shrunkencolor=:green`: whether to draw the
+  per-group shrunken/BLUP line (`LinearMixedModel` source only).
+- `labelcolor`, `labelsize`: styling for the per-panel group-level corner label.
+
+The mutating methods return the original object.
+"""
+function facetregression!(f::Indexable, info::FacetRegressionInfo;
+                          orderby::Union{Symbol,Nothing}=nothing,
+                          rev::Bool=false,
+                          layout::Union{Nothing,Tuple{_MaybeInt,_MaybeInt}}=nothing,
+                          bank45::Bool=true,
+                          xlabel::AbstractString=string(info.predictor),
+                          ylabel::AbstractString=string(info.response),
+                          scattercolor=(:blue, 0.4),
+                          linecolor=:red,
+                          show_fixef::Bool=true,
+                          fixefcolor=:black,
+                          fixeflinestyle=:dash,
+                          show_shrunken::Bool=true,
+                          shrunkencolor=:green,
+                          labelcolor=:black,
+                          labelsize=12)
     perm = _facetregression_order(info, orderby; rev)
     labels = info.labels[perm]
     lo = _facetregression_layout(length(labels), layout)
@@ -248,89 +392,18 @@ function _facetregression_render!(f::Indexable, info::NamedTuple;
     return f
 end
 
-"""
-    facetregression(data, response, predictor, group; kwargs...)::Figure
-    facetregression!(f::$(Indexable), data, response, predictor, group; kwargs...)
-    facetregression(m::LinearMixedModel, predictor, group=first(fnames(m)); kwargs...)::Figure
-    facetregression!(f::$(Indexable), m::LinearMixedModel, predictor,
-                     group=first(fnames(m)); kwargs...)
-    facetregression(m::LinearMixedModel; group=first(fnames(m)), kwargs...)::Figure
-    facetregression!(f::$(Indexable), m::LinearMixedModel;
-                     group=first(fnames(m)), kwargs...)
-
-Create a Cleveland-trellis-style small-multiples display: one panel per level of
-`group`, each showing a scatter of `response` against `predictor` plus that
-group's own OLS regression line.
-
-The table-based methods take `response`, `predictor`, and `group` as `Symbol` or
-`AbstractString` column names into any Tables.jl-compatible `data`.
-
-The `LinearMixedModel`-based methods instead extract everything from the model's
-own matrices — no data table is needed. `predictor` must be the name of a
-continuous fixed-effect term (e.g. `:days`); `group` names a grouping factor and
-defaults to the first one (`first(fnames(m))`). Two extra reference lines are
-drawn in every panel: the population-level fixed-effects fit (`show_fixef`,
-the same line in every panel) and that group's own shrunken/BLUP fit
-`(`show_shrunken`).
-
-`predictor` may be omitted entirely (note `group` then becomes keyword-only, to
-avoid ambiguity with the `predictor` positional argument), in which case it
-defaults to the model's only non-intercept fixed-effect term — this throws an
-`ArgumentError` if the model has more than one such term.
-
-All panels share linked x/y axes (Cleveland-trellis convention), so slopes and
-scatter remain visually comparable across panels.
-
-!!! warning "Evolving design"
-    `facetregression` is still experimental. The keyword set (e.g. the
-    `LinearMixedModel` overlay colors/lines, banking behavior) may change in
-    minor releases without being treated as breaking.
-
-# Keywords
-- `orderby::Symbol=:none`: panel order — `:none` preserves the order groups are
-  first encountered (not alphabetical), `:intercept`/`:slope` sort by the
-  group's own within-unit OLS fit.
-- `rev::Bool=false`: reverse the panel order produced by `orderby` (applied
-  after sorting, so it also reverses `:none`'s first-encountered order).
-- `layout::Union{Nothing,Tuple{Union{Nothing,Int},Union{Nothing,Int}}}=nothing`:
-  `(nrow, ncol)` grid shape. `nothing` auto-computes a roughly square grid.
-  Either element may be `nothing` to auto-compute just that one from the
-  other (e.g. `layout=(2, nothing)` fixes 2 rows and picks enough columns to
-  fit every group). If both are given and their product is smaller than the
-  number of groups, the grid is used as given (never enlarged) and a warning
-  reports how many trailing groups are left undisplayed.
-- `bank45::Bool=true`: shape the grid columns (via `colsize!` with a
-  `GridLayoutBase.Aspect` size) so that a line with the *mean* of the
-  per-group within-unit OLS slopes appears at 45° on screen ("banking", after
-  Cleveland's trellis displays), easing visual comparison of slopes across
-  panels. Full data is always shown — banking reshapes the panels, it never
-  clips data. `bank45=false` leaves panels at their natural (roughly square)
-  shape.
-- `xlabel`/`ylabel`: shared axis titles spanning the whole grid (default to the
-  `predictor`/`response` names).
-- `scattercolor`, `linecolor`: per-panel scatter and within-unit regression-line
-  colors.
-- `show_fixef::Bool=true`, `fixefcolor=:black`, `fixeflinestyle=:dash`: whether
-  to draw the population fixed-effects line (`LinearMixedModel` source only).
-- `show_shrunken::Bool=true`, `shrunkencolor=:green`: whether to draw the
-  per-group shrunken/BLUP line (`LinearMixedModel` source only).
-- `labelcolor`, `labelsize`: styling for the per-panel group-level corner label.
-
-The mutating methods return the original object.
-"""
 function facetregression!(f::Indexable, data, response::Union{Symbol,AbstractString},
                           predictor::Union{Symbol,AbstractString},
                           group::Union{Symbol,AbstractString}; kwargs...)
-    df = DataFrame(data)
-    info = _facetregression_data(df, Symbol(response), Symbol(predictor), Symbol(group))
-    return _facetregression_render!(f, info; kwargs...)
+    info = facetregressioninfo(data, response, predictor, group)
+    return facetregression!(f, info; kwargs...)
 end
 
 function facetregression!(f::Indexable, m::LinearMixedModel,
                           predictor::Union{Symbol,AbstractString},
                           group::Union{Symbol,AbstractString}=first(fnames(m)); kwargs...)
-    info = _facetregression_data(m, predictor, group)
-    return _facetregression_render!(f, info; kwargs...)
+    info = facetregressioninfo(m, predictor, group)
+    return facetregression!(f, info; kwargs...)
 end
 
 function facetregression!(f::Indexable, m::LinearMixedModel;
@@ -357,15 +430,21 @@ function facetregression(m::LinearMixedModel;
     return facetregression!(Figure(; size=(1000, 800)), m; group, kwargs...)
 end
 
-"""
-    facetregressiontable(data, response, predictor, group; orderby::Symbol=:none)::DataFrame
-    facetregressiontable(m::LinearMixedModel, predictor, group=first(fnames(m));
-                         orderby::Symbol=:none)::DataFrame
-    facetregressiontable(m::LinearMixedModel; group=first(fnames(m)),
-                         orderby::Symbol=:none)::DataFrame
+function facetregression(info::FacetRegressionInfo; kwargs...)
+    return facetregression!(Figure(; size=(1000, 800)), info; kwargs...)
+end
 
-Return the per-group OLS fits underlying [`facetregression!`](@ref) as a
-`DataFrame`, one row per level of `group`, with columns:
+"""
+    facetregressioninfotable(info::FacetRegressionInfo; orderby::Union{Symbol,Nothing}=nothing, rev::Bool=false)::DataFrame
+    facetregressioninfotable(data, response, predictor, group; orderby::Union{Symbol,Nothing}=nothing, rev::Bool=false)::DataFrame
+    facetregressioninfotable(m::LinearMixedModel, predictor, group=first(fnames(m));
+                             orderby::SUnion{Symbol,Nothing}=nothing, rev::Bool=false)::DataFrame
+    facetregressioninfotable(m::LinearMixedModel; group=first(fnames(m)),
+                             orderby::Union{Symbol,Nothing}=nothing, rev::Bool=false)::DataFrame
+
+Return the per-group OLS fits in `info` (or derived from `data`/`m`) underlying
+[`facetregression!`](@ref) as a `DataFrame`, one row per level of `group`, with
+columns:
 - `group`: the group level
 - `n`: number of observations in that group
 - `intercept`, `slope`: the group's within-unit OLS fit of `response` on `predictor`
@@ -374,7 +453,7 @@ As with [`facetregression!`](@ref), `predictor` may be omitted for the
 `LinearMixedModel` methods (`group` then becomes keyword-only), defaulting to
 the model's only non-intercept fixed-effect term.
 
-The `LinearMixedModel` method additionally has:
+The `LinearMixedModel`-derived `info` additionally has:
 - `fixef_intercept`, `fixef_slope`: the population fixed-effects fit (same for
   every row)
 - `shrunken_intercept`, `shrunken_slope`: that group's shrunken/BLUP fit (fixed
@@ -382,39 +461,47 @@ The `LinearMixedModel` method additionally has:
 
 `orderby` and `rev` have the same meaning as in [`facetregression!`](@ref).
 
+The `data`/`m`-based methods are convenience wrappers equivalent to
+`facetregressioninfotable(facetregressioninfo(data_or_m, args...); orderby, rev)`.
+
 !!! warning "Evolving design"
-    `facetregression`/`facetregressiontable` are still experimental and their
+    `facetregression`/`facetregressioninfotable` are still experimental and their
     design (e.g. the `LinearMixedModel` columns) may change in minor releases
     without being treated as breaking.
 """
-function facetregressiontable(data, response::Union{Symbol,AbstractString},
-                              predictor::Union{Symbol,AbstractString},
-                              group::Union{Symbol,AbstractString};
-                              orderby::Symbol=:none, rev::Bool=false)
-    df = DataFrame(data)
-    info = _facetregression_data(df, Symbol(response), Symbol(predictor), Symbol(group))
+function facetregressioninfotable(info::FacetRegressionInfo; orderby::Union{Symbol,Nothing}=nothing,
+                                  rev::Bool=false)
     perm = _facetregression_order(info, orderby; rev)
-    return DataFrame(; group=info.labels[perm], n=info.n[perm],
-                     intercept=info.intercept[perm], slope=info.slope[perm])
+    cols = (; group=info.labels[perm], n=info.n[perm],
+            intercept=info.intercept[perm], slope=info.slope[perm])
+    if info.fixef !== nothing
+        a_pop, b_pop = info.fixef
+        cols = merge(cols, (; fixef_intercept=fill(a_pop, length(perm)),
+                            fixef_slope=fill(b_pop, length(perm)),
+                            shrunken_intercept=info.shrunken_intercept[perm],
+                            shrunken_slope=info.shrunken_slope[perm]))
+    end
+    return DataFrame(; cols...)
 end
 
-function facetregressiontable(m::LinearMixedModel, predictor::Union{Symbol,AbstractString},
-                              group::Union{Symbol,AbstractString}=first(fnames(m));
-                              orderby::Symbol=:none, rev::Bool=false)
-    info = _facetregression_data(m, predictor, group)
-    perm = _facetregression_order(info, orderby; rev)
-    a_pop, b_pop = info.fixef
-    return DataFrame(; group=info.labels[perm], n=info.n[perm],
-                     intercept=info.intercept[perm], slope=info.slope[perm],
-                     fixef_intercept=fill(a_pop, length(perm)),
-                     fixef_slope=fill(b_pop, length(perm)),
-                     shrunken_intercept=info.shrunken_intercept[perm],
-                     shrunken_slope=info.shrunken_slope[perm])
+function facetregressioninfotable(data, response::Union{Symbol,AbstractString},
+                                  predictor::Union{Symbol,AbstractString},
+                                  group::Union{Symbol,AbstractString};
+                                  orderby::Union{Symbol,Nothing}=nothing, rev::Bool=false)
+    info = facetregressioninfo(data, response, predictor, group)
+    return facetregressioninfotable(info; orderby, rev)
 end
 
-function facetregressiontable(m::LinearMixedModel;
-                              group::Union{Symbol,AbstractString}=first(fnames(m)),
-                              orderby::Symbol=:none, rev::Bool=false)
+function facetregressioninfotable(m::LinearMixedModel, predictor::Union{Symbol,AbstractString},
+                                  group::Union{Symbol,AbstractString}=first(fnames(m));
+                                  orderby::Union{Symbol,Nothing}=nothing, rev::Bool=false)
+    info = facetregressioninfo(m, predictor, group)
+    return facetregressioninfotable(info; orderby, rev)
+end
+
+function facetregressioninfotable(m::LinearMixedModel;
+                                  group::Union{Symbol,AbstractString}=first(fnames(m)),
+                                  orderby::Union{Symbol,Nothing}=nothing, rev::Bool=false)
     predictor = _facetregression_default_predictor(m)
-    return facetregressiontable(m, predictor, group; orderby, rev)
+    return facetregressioninfotable(m, predictor, group; orderby, rev)
 end

@@ -40,26 +40,26 @@ let fig = Figure()
     @test save(joinpath(OUTDIR, "facetregression_gridpos.png"), fig)
 end
 
-@testset "facetregressiontable" begin
-    ft = facetregressiontable(data, :y, :x, :g)
+@testset "facetregressioninfotable" begin
+    ft = facetregressioninfotable(data, :y, :x, :g)
     @test names(ft) == ["group", "n", "intercept", "slope"]
     @test nrow(ft) == length(unique(data.g))
     @test all(==(5), ft.n)
 
-    # :none preserves first-encountered order, not alphabetical
+    # nothing preserves first-encountered order, not alphabetical
     @test ft.group == unique(data.g)
 
     # :slope sorts increasing
-    ft_slope = facetregressiontable(data, :y, :x, :g; orderby=:slope)
+    ft_slope = facetregressioninfotable(data, :y, :x, :g; orderby=:slope)
     @test issorted(ft_slope.slope)
 
     # :intercept sorts increasing
-    ft_intercept = facetregressiontable(data, :y, :x, :g; orderby=:intercept)
+    ft_intercept = facetregressioninfotable(data, :y, :x, :g; orderby=:intercept)
     @test issorted(ft_intercept.intercept)
 
-    # rev reverses whatever ordering orderby produced, including :none
-    @test facetregressiontable(data, :y, :x, :g; rev=true).group == reverse(ft.group)
-    ft_slope_rev = facetregressiontable(data, :y, :x, :g; orderby=:slope, rev=true)
+    # rev reverses whatever ordering orderby produced, including nothing
+    @test facetregressioninfotable(data, :y, :x, :g; rev=true).group == reverse(ft.group)
+    ft_slope_rev = facetregressioninfotable(data, :y, :x, :g; orderby=:slope, rev=true)
     @test issorted(ft_slope_rev.slope; rev=true)
 
     # matches a direct simplelinreg computation for one group
@@ -72,7 +72,7 @@ end
 end
 
 @test_throws ArgumentError facetregression(data, :y, :x, :g; orderby=:bogus)
-@test_throws ArgumentError facetregressiontable(data, :y, :x, :g; orderby=:bogus)
+@test_throws ArgumentError facetregressioninfotable(data, :y, :x, :g; orderby=:bogus)
 
 # --- LinearMixedModel-based methods ---
 
@@ -106,14 +106,14 @@ let fig = Figure()
     @test save(joinpath(OUTDIR, "facetregression_model_autopredictor_gridpos.png"), fig)
 end
 
-@testset "facetregressiontable (model)" begin
-    ft = facetregressiontable(m1, :days)
+@testset "facetregressioninfotable (model)" begin
+    ft = facetregressioninfotable(m1, :days)
     @test names(ft) ==
           ["group", "n", "intercept", "slope", "fixef_intercept", "fixef_slope",
            "shrunken_intercept", "shrunken_slope"]
     @test nrow(ft) == length(m1.reterms[1].levels)
 
-    # :none preserves the model's own level order, not resorted
+    # nothing preserves the model's own level order, not resorted
     @test ft.group == m1.reterms[1].levels
 
     # population fit is constant across rows and matches fixef(m1)
@@ -127,22 +127,22 @@ end
     @test ft.shrunken_slope .- fe[2] ≈ vec(re[2, :])
 
     # m0 has no random slope on days: shrunken slope == population slope everywhere
-    ft0 = facetregressiontable(m0, :days)
+    ft0 = facetregressioninfotable(m0, :days)
     @test all(≈(fixef(m0)[2]), ft0.shrunken_slope)
 
     # omitting predictor matches passing it explicitly
-    @test facetregressiontable(m1) == facetregressiontable(m1, :days)
+    @test facetregressioninfotable(m1) == facetregressioninfotable(m1, :days)
 
     # rev/orderby behave the same as the table-based method
-    ft_slope = facetregressiontable(m1, :days; orderby=:slope)
+    ft_slope = facetregressioninfotable(m1, :days; orderby=:slope)
     @test issorted(ft_slope.slope)
-    ft_slope_rev = facetregressiontable(m1, :days; orderby=:slope, rev=true)
+    ft_slope_rev = facetregressioninfotable(m1, :days; orderby=:slope, rev=true)
     @test issorted(ft_slope_rev.slope; rev=true)
 end
 
 @test_throws ArgumentError facetregression(m1, :days, :nonexistent)
 @test_throws ArgumentError facetregression(m1, :nonexistent_predictor)
 @test_throws ArgumentError facetregression(m2) # more than one non-intercept fixed effect
-@test_throws ArgumentError facetregressiontable(m1, :days, :nonexistent)
-@test_throws ArgumentError facetregressiontable(m1, :nonexistent_predictor)
-@test_throws ArgumentError facetregressiontable(m2)
+@test_throws ArgumentError facetregressioninfotable(m1, :days, :nonexistent)
+@test_throws ArgumentError facetregressioninfotable(m1, :nonexistent_predictor)
+@test_throws ArgumentError facetregressioninfotable(m2)
