@@ -334,8 +334,9 @@ end
                   gf::Symbol=first(fnames(m)); kwargs...)
     shrinkagedot!(f::$(Indexable), r::ShrinkageInfo;
                   orderby=1, cols::Union{Nothing,AbstractVector}=nothing,
+                  ordertype=:shrunk,
                   shrunk_dotcolor=(:blue, 0.25), ref_dotcolor=(:red, 0.25),
-                  barcolor=:black,
+                  arrowcolor=:black,
                   vline_at_zero::Bool=false)
 
 Create a "dot plot" of the random-effects conditional modes and corresponding unshrunken reference values.
@@ -348,7 +349,8 @@ Alternatively, [`shrinkageinfo`](@ref) may be used to construct the [`ShrinkageI
 Constructing `ShrinkageInfo` directly can be used to avoid re-computing the conditional variances.
 
 The order of the levels on the vertical axes is increasing `orderby` column
-of `r.ranef`, usually the `(Intercept)` random effects.
+of `r.blups` (shrunk effects) or `r.blimps` (reference/unshrunken effects), usually the `(Intercept)` random effects.
+Which to sort by is controlled via `ordertype` (`:shrunk` or `:ref`).
 Setting `orderby=nothing` will disable sorting, i.e. return the levels in the
 order they are stored in.
 
@@ -361,7 +363,7 @@ The mutating methods return the original object.
     Even when not sorting the levels, they might have already been sorted during
     model matrix construction. If you want impose a particular ordering on the
     levels, then you must sort the relevant fields in the `ShrinkageInfo` object before
-    calling `dot!`.
+    calling `shrinkagedot!`.
 
 !!! note
     `orderby` is the ``n``th column of the columns specified by `cols`.
