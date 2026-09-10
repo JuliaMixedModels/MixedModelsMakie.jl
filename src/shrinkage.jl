@@ -128,6 +128,8 @@ unable to see the ellipses, try increasing `ellipse_scale`.
 
 The mutating method returns the original object.
 
+See also [`shrinkagedot`](@ref).
+
 !!! note
     For degenerate (singular) models, the correlation ellipse will also be degenerate, i.e.,
     collapse to a point or line.
@@ -143,6 +145,7 @@ function shrinkageplot!(f::Indexable,
                         ellipse_color=:green, ellipse_linestyle=:dash,
                         labels::Union{Bool,Symbol,AbstractVector}=false,
                         labelcolor=:black, labelsize=10, n_labels::Integer=5) where {T}
+    # TODO: could ShrinkageInfo simplify some book keeping here?
     reind = _group_idx(m, gf)
     r = m.reterms[reind]
     user_specified_single = !isnothing(cols) && length(cols) == 1
@@ -323,4 +326,90 @@ end
 
 function shrinkageinfotable(m::MixedModel, args...; kwargs...)
     return shrinkageinfotable(shrinkageinfo(m, args...; kwargs...))
+end
+
+"""
+    shrinkagedot(m::MixedModel, gf::Symbol=first(fnames(m)); kwargs...)::Figure
+    shrinkagedot!(f::$(Indexable), m::MixedModel,
+                  gf::Symbol=first(fnames(m)); kwargs...)
+    shrinkagedot!(f::$(Indexable), r::ShrinkageInfo;
+                  orderby=1, cols::Union{Nothing,AbstractVector}=nothing,
+                  shrunk_dotcolor=(:blue, 0.25), ref_dotcolor=(:red, 0.25),
+                  barcolor=:black,
+                  vline_at_zero::Bool=false)
+
+Create a "dot plot" of the random-effects conditional modes and corresponding unshrunken reference values.
+
+The dot plot is similar in spirit to a one-dimensional [`shrinkageplot`](@ref) and shows the change in each
+predictor more clearly.
+
+When passing a `MixedModel`, `gf` specifies which grouping variable is displayed.
+Alternatively, [`shrinkageinfo`](@ref) may be used to construct the [`ShrinkageInfo`](@ref) object directly.
+Constructing `ShrinkageInfo` directly can be used to avoid re-computing the conditional variances.
+
+The order of the levels on the vertical axes is increasing `orderby` column
+of `r.ranef`, usually the `(Intercept)` random effects.
+Setting `orderby=nothing` will disable sorting, i.e. return the levels in the
+order they are stored in.
+
+The display can be restricted to a subset of random effects associated with a grouping variable by
+specifying `cols`, either by indices or term names.
+
+The mutating methods return the original object.
+
+!!! note
+    Even when not sorting the levels, they might have already been sorted during
+    model matrix construction. If you want impose a particular ordering on the
+    levels, then you must sort the relevant fields in the `ShrinkageInfo` object before
+    calling `dot!`.
+
+!!! note
+    `orderby` is the ``n``th column of the columns specified by `cols`.
+"""
+function shrinkagedot!(f::Indexable, r::ShrinkageInfo;
+                       # TODO: allow orderby to be specified as a name
+                       orderby=1, cols::Union{Nothing,AbstractVector}=nothing,
+                       ordertype=:shrunk,
+                       shrunk_dotcolor=(:blue, 0.25), 
+                       ref_dotcolor=(:red, 0.25),
+                       arrowcolor=:black,
+                       vline_at_zero::Bool=false)
+    cols = something(cols, axes(r.cnames, 1))
+    cols = _cols_to_idx(r.cnames, cols)
+    blups = view(r.blups, :, cols)
+    blimps = view(r.blimps, :, cols)
+    cn = view(r.cnames, cols)
+    y = axes(blups, 1)
+    # TODO: check for invalid input 
+    # we want to restrict this to :shrunk and :ref
+    orderer = ordertype === :shrunk ? blups : blimps 
+    ord = isnothing(orderby) ? y : sortperm(view(orderer, :, orderby))
+    axs = [Axis(f[1, j]) for j in axes(blups, 2)]
+    linkyaxes!(axs...)
+    y0 = zeros(y)
+    for (j, ax) in enumerate(axs)
+        x_blups = view(blups, ord, j)
+        x_blimps = view(blimps, ord, j)
+        # first so arrow heads don't obscure pts
+        arrows!(ax, x_blimps, y, x_blups .- x_blimps, y0; color=arrowcolor)
+        scatter!(ax, x_blups, y; color=shrunk_dotcolor)
+        scatter!(ax, x_blimps, y; color=ref_dotcolor)
+        # errorbars!(ax, xvals, y, 1.960 * view(sd, ord, j); direction=:x, color=barcolor)
+        ax.xlabel = cn[j]
+        ax.yticks = y
+        j > 1 && hideydecorations!(ax; grid=false)
+        vline_at_zero && vlines!(ax, 0; color=(:black, 0.75), linestyle=:dash)
+    end
+    axs[1].yticks = (y, string.(r.levels[ord]))
+    return f
+end
+
+function shrinkagedot!(f::Indexable, m::MixedModel,
+                      gf::Symbol=first(fnames(m)); kwargs...)
+    return shrinkagedot!(f, shrinkageinfo(m, gf); kwargs...)
+end
+
+"""$(@doc shrinkagedot)"""
+function shrinkagedot(m::MixedModel, gf::Symbol=first(fnames(m)); kwargs...)
+    return shrinkagedot!(Figure(; size=(1000, 800)), m, gf; kwargs...)
 end

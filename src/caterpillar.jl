@@ -141,6 +141,7 @@ The mutating methods return the original object.
     `orderby` is the ``n``th column of the columns specified by `cols`.
 """
 function caterpillar!(f::Indexable, r::RanefInfo;
+                      # TODO allow specifying orderby as a column name
                       orderby=1, cols::Union{Nothing,AbstractVector}=nothing,
                       dotcolor=(:red, 0.2), barcolor=:black,
                       vline_at_zero::Bool=false)
