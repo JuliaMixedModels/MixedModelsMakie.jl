@@ -90,7 +90,8 @@ function _resolve_orderby(cn::AbstractVector{<:AbstractString}, orderby::Integer
     return orderby
 end
 
-function _resolve_orderby(cn::AbstractVector{<:AbstractString}, orderby::Union{Symbol,AbstractString})
+function _resolve_orderby(cn::AbstractVector{<:AbstractString},
+                          orderby::Union{Symbol,AbstractString})
     return only(_cols_to_idx(collect(cn), [orderby]))
 end
 

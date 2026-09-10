@@ -325,7 +325,7 @@ function shrinkageplot!(f::Indexable,
 end
 
 """$(@doc shrinkageplot!)"""
-function shrinkageplot(m::Union{MixedModel, ShrinkageInfo}, args...; kwargs...)
+function shrinkageplot(m::Union{MixedModel,ShrinkageInfo}, args...; kwargs...)
     f = Figure(; size=(1000, 1000)) # use an aspect ratio of 1 for the whole figure
 
     return shrinkageplot!(f, m, args...; kwargs...)
