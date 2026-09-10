@@ -198,3 +198,115 @@ function shrinkageplot(m::MixedModel, args...; kwargs...)
 
     return shrinkageplot!(f, m, args...; kwargs...)
 end
+
+"""
+    ShrinkageInfo
+
+Information on random effects compared to pseudo-OLS estimates.
+
+Used for creating shrinkage caterpillar plots.
+
+# Fields
+
+$(TYPEDFIELDS)
+
+"""
+struct ShrinkageInfo{T<:AbstractFloat}
+    """Column names, i.e. predictor coefficient names"""
+    cnames::Vector{String}
+    """Levels of the random effect, i.e. group names"""
+    levels::Vector
+    "The conditional modes of the random effects"
+    blups::Matrix{T}
+    """The 'reference' mode of the random effect, 
+       corresponding to the conditional mode evaluated at
+       the reference value of θ. Typically, this approximates
+       the value you would get without any shrinkage, e.g. from
+       classical within-groups (non-mixed) regression
+    """
+    blimps::Matrix{T}
+end
+
+"""
+    shrinkageinfo(m::MixedModel)
+
+Return a `NamedTuple{fnames(m), NTuple(k, ShrinkageInfo)}` from model `m`
+"""
+function shrinkageinfo(m::MixedModel{T}, θref::Vector{<:AbstractFloat}=_ref_theta(m)) where {T}
+    fn = fnames(m)
+    val = sizehint!(ShrinkageInfo[], length(fn))
+    re = ranef(m)
+    re_ref = _ranef(m, θref)
+    for grp in fn
+        push!(val, shrinkageinfo(m, grp, re, re_ref))
+    end
+    return NamedTuple{fn}((val...,))
+end
+
+"""
+    shrinkageinfo(m::MixedModel, gf::Symbol)
+
+Return a `Shrinkageinfo` corresponding to the grouping variable `gf` model `m`.
+"""
+function shrinkageinfo(m::MixedModel, gf::Symbol, θref::Vector{<:AbstractFloat}=_ref_theta(m))
+    return shrinkageinfo(m, gf, ranef(m), _ranef(m, θref)) 
+end
+
+function shrinkageinfo(m::MixedModel{T}, gf::Symbol, 
+                       re::Vector{Matrix{T}}, re_inf::Vector{Matrix{T}}) where {T}
+    idx = _group_idx(m, gf)
+    # XXX replace ranef(m)[idx] with ranef(m, gf) when that becomes available upstream
+    re_term = m.reterms[idx]
+    blups = re[idx]
+    blimps = re_inf[idx]
+    return ShrinkageInfo(re_term.cnames,
+                         re_term.levels,
+                         Matrix(adjoint(blups)),
+                         Matrix(adjoint(blimps)))
+end
+
+function shrinkageinfo(m::GeneralizedLinearMixedModel, args...; kwargs...)
+    return shrinkageinfo(m.LMM, args...; kwargs...)
+end
+
+"""
+    shrinkageinfotable(si::Shrinkageinfo)
+
+Return the information in `si` as a column table (`NamedTuple` of `Vector`s)
+
+The columns are
+
+- `name`: name of the random effect
+- `level`: level of the grouping factor
+- `cmode`: conditional mode of the random effect
+- `rmode`: reference mode of the random effect, 
+           corresponding to the conditional mode evaluated at
+           the reference value of θ. Typically, this approximates
+           the value you would get without any shrinkage, e.g. from
+           classical within-groups (non-mixed) regression
+"""
+function shrinkageinfotable(si::ShrinkageInfo)
+    cnames, levels = si.cnames, si.levels
+    k = length(cnames)
+    l = length(levels)
+    return (;
+            name=repeat(cnames; inner=l),
+            level=repeat(levels; outer=k),
+            cmode=vec(si.blups),
+            rmode=vec(si.blimps))
+end
+
+function shrinkageinfotable(sis::NamedTuple)
+    rowtable = mapreduce(vcat, propertynames(sis), values(sis)) do grpname, si
+        table = shrinkageinfotable(si)
+        table = merge((; group=fill(grpname, length(table.name))),
+                      table)
+        return Tables.rowtable(table)
+    end
+
+    return Tables.columntable(rowtable)
+end
+
+function shrinkageinfotable(m::MixedModel, args...; kwargs...)
+    return shrinkageinfotable(shrinkageinfo(m, args...; kwargs...))
+end

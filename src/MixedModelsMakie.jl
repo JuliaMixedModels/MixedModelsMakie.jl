@@ -18,6 +18,7 @@ using StatsModels: StatsModels, CategoricalTerm, terms
 using MixedModels: fit
 
 export RanefInfo,
+       ShrinkageInfo,
        caterpillar,
        caterpillar!,
        clevelandaxes!,
@@ -40,6 +41,8 @@ export RanefInfo,
        ridge2d!,
        ridgeplot,
        ridgeplot!,
+       shrinkageinfo,
+       shrinkageinfotable,
        shrinkageplot,
        shrinkageplot!,
        simplelinreg,
