@@ -74,6 +74,21 @@ function ranefinfotable(ri::RanefInfo)
             cstddev=vec(ri.stddev))
 end
 
+function ranefinfotable(ris::NamedTuple)
+    rowtable = mapreduce(vcat, propertynames(ris), values(ris)) do grpname, ri
+        table = ranefinfotable(ri)
+        table = merge((; group=fill(grpname, length(table.name))),
+                      table)
+        return Tables.rowtable(table)
+    end
+
+    return Tables.columntable(rowtable)
+end
+
+function ranefinfotable(m::MixedModel, args...; kwargs...)
+    return ranefinfotable(ranefinfo(m, args...; kwargs...))
+end
+
 """
     caterpillar(m::MixedModel, gf::Symbol=first(fnames(m)); kwargs...)::Figure
     caterpillar!(f::$(Indexable), m::MixedModel,
