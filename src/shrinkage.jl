@@ -1,15 +1,3 @@
-getellipsepoints(radius, lambda) = getellipsepoints(0, 0, radius, lambda)
-
-function getellipsepoints(cx, cy, radius, lambda)
-    t = range(0, 2π; length=100)
-    ellipse_x_r = cos.(t)
-    ellipse_y_r = sin.(t)
-    r_ellipse = radius .* hcat(ellipse_x_r, ellipse_y_r) * lambda'
-    x = @. cx + r_ellipse[:, 2]
-    y = @. cy + r_ellipse[:, 1]
-    return x, y
-end
-
 """
     _auto_label_idx(reest, n_labels)
 
@@ -25,6 +13,54 @@ function _auto_label_idx(reest, n_labels::Integer)
     n_labels = min(n_labels, size(reest, 2))
     score = [norm(view(reest, :, i)) for i in axes(reest, 2)]
     return partialsortperm(score, 1:n_labels; rev=true)
+end
+
+getellipsepoints(radius, lambda) = getellipsepoints(0, 0, radius, lambda)
+
+function getellipsepoints(cx, cy, radius, lambda)
+    t = range(0, 2π; length=100)
+    ellipse_x_r = cos.(t)
+    ellipse_y_r = sin.(t)
+    r_ellipse = radius .* hcat(ellipse_x_r, ellipse_y_r) * lambda'
+    x = @. cx + r_ellipse[:, 2]
+    y = @. cy + r_ellipse[:, 1]
+    return x, y
+end
+
+"""
+    _ranef(m::MixedModel, θref; uscale::Bool=false)
+
+Compute the conditional modes at θref.
+
+!!! warn
+    This function is **not** thread safe because it temporarily mutates
+    the passed model before restoring its original form.
+"""
+function _ranef(m::LinearMixedModel, θref; uscale::Bool=false)
+    vv = try
+        ranef(updateL!(setθ!(m, θref)))
+    catch e
+        @error "Failed to compute unshrunken values with the following exception:"
+        rethrow(e)
+    finally
+        updateL!(setθ!(m, m.optsum.final)) # restore parameter estimates and update m
+    end
+    return vv
+end
+
+function _ranef(m::GeneralizedLinearMixedModel, θref; uscale::Bool=false)
+    fast = length(m.θ) == length(m.optsum.final)
+    setpar! = fast ? MixedModels.setθ! : MixedModels.setβθ!
+    vv = try
+        ranef(pirls!(setpar!(m, θref), fast, false)) # not verbose
+    catch e
+        @error "Failed to compute unshrunken values with the following exception:"
+        rethrow(e)
+    finally
+        pirls!(setpar!(m, m.optsum.final), fast, false) # restore parameter estimates and update m
+    end
+
+    return vv
 end
 
 function _shrinkage_panel!(ax::Axis, i::Int, j::Int, reref, reest, λ;
@@ -158,42 +194,6 @@ function shrinkageplot!(f::Indexable,
                label_idx, labelnames, labelcolor, labelsize)
 
     return f
-end
-
-"""
-    _ranef(m::MixedModel, θref; uscale::Bool=false)
-
-Compute the conditional modes at θref.
-
-!!! warn
-    This function is **not** thread safe because it temporarily mutates
-    the passed model before restoring its original form.
-"""
-function _ranef(m::LinearMixedModel, θref; uscale::Bool=false)
-    vv = try
-        ranef(updateL!(setθ!(m, θref)))
-    catch e
-        @error "Failed to compute unshrunken values with the following exception:"
-        rethrow(e)
-    finally
-        updateL!(setθ!(m, m.optsum.final)) # restore parameter estimates and update m
-    end
-    return vv
-end
-
-function _ranef(m::GeneralizedLinearMixedModel, θref; uscale::Bool=false)
-    fast = length(m.θ) == length(m.optsum.final)
-    setpar! = fast ? MixedModels.setθ! : MixedModels.setβθ!
-    vv = try
-        ranef(pirls!(setpar!(m, θref), fast, false)) # not verbose
-    catch e
-        @error "Failed to compute unshrunken values with the following exception:"
-        rethrow(e)
-    finally
-        pirls!(setpar!(m, m.optsum.final), fast, false) # restore parameter estimates and update m
-    end
-
-    return vv
 end
 
 """$(@doc shrinkageplot!)"""
