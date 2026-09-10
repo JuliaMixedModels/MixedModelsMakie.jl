@@ -418,6 +418,14 @@ nestingstructure(gm2)
 Panels share linked axes so slopes remain visually comparable across groups; by default the shared y-range is chosen so that the *mean* of the per-group slopes appears at 45° on screen ("banking to 45°"), which is where slope differences are easiest to compare visually (Cleveland, W. S. (1993), *Visualizing Data*, Hobart Press).
 
 ```@docs
+FacetRegressionInfo
+```
+
+```@docs
+facetregressioninfo
+```
+
+```@docs
 facetregression!
 ```
 
@@ -457,18 +465,33 @@ facetregression(fm1, :days)
 facetregression(fm1)
 ```
 
-The per-group fits are also available as a table via [`facetregressiontable`](@ref):
+Computing the per-group OLS fits (and, for a model, `fixef`/`ranef`) can be
+expensive to repeat, so `facetregressioninfo` can be called once and the
+resulting `FacetRegressionInfo` reused across multiple `facetregression`
+calls:
+
+```@example FacetRegression
+info = facetregressioninfo(fm1, :days)
+
+facetregression(info)
+```
+
+```@example FacetRegression
+facetregression(info; bank45=false)
+```
+
+The per-group fits are also available as a table via [`facetregressioninfotable`](@ref):
 
 ```@docs
-facetregressiontable
+facetregressioninfotable
 ```
 
 ```@example FacetRegression
-facetregressiontable(sleepstudy, :reaction, :days, :subj; orderby=:slope)
+facetregressioninfotable(sleepstudy, :reaction, :days, :subj; orderby=:slope)
 ```
 
 ```@example FacetRegression
-facetregressiontable(fm1, :days; orderby=:slope)
+facetregressioninfotable(fm1, :days; orderby=:slope)
 ```
 
 ## General plots

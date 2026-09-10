@@ -17,7 +17,8 @@ using StatsModels: StatsModels, CategoricalTerm, terms
 # why, BSplineKit, do you export fit???
 using MixedModels: fit
 
-export RanefInfo,
+export FacetRegressionInfo,
+       RanefInfo,
        ShrinkageInfo,
        caterpillar,
        caterpillar!,
@@ -26,7 +27,8 @@ export RanefInfo,
        coefplot!,
        facetregression,
        facetregression!,
-       facetregressiontable,
+       facetregressioninfo,
+       facetregressioninfotable,
        nestingplot,
        nestingplot!,
        nestingstructure,
@@ -79,6 +81,7 @@ include("xyplot.jl")
 include("facetregression.jl")
 include("recipes.jl")
 include("upset.jl")
+include("deprecate.jl")
 
 @setup_workload begin
     model = fit(MixedModel, @formula(reaction ~ 1 + days + (1 + days | subj)),
