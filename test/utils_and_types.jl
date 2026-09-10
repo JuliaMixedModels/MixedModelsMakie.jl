@@ -8,6 +8,15 @@
     @test MixedModelsMakie.zquantile(0.50) ≈ 0
 end
 
+@testset "_resolve_orderby" begin
+    cn = ["(Intercept)", "days"]
+    @test isnothing(MixedModelsMakie._resolve_orderby(cn, nothing))
+    @test MixedModelsMakie._resolve_orderby(cn, 2) == 2
+    @test MixedModelsMakie._resolve_orderby(cn, :days) == 2
+    @test MixedModelsMakie._resolve_orderby(cn, "days") == 2
+    @test_throws ArgumentError MixedModelsMakie._resolve_orderby(cn, :nonexistent)
+end
+
 @testset "_histcurve" begin
     curve = MixedModelsMakie._histcurve(zeros(50); bins=1)
     @test curve isa MixedModelsMakie._StepCurve
@@ -108,4 +117,49 @@ end
     tbl = ranefinfotable(re1)
     @test keys(tbl) == (:name, :level, :cmode, :cstddev)
     @test length(tbl.cmode) == length(re1.cnames) * length(re1.levels)
+
+    tbl2 = ranefinfotable(m1_speed, :subj)
+    @test tbl2 == tbl
+
+    reinfo2 = ranefinfo(m2)
+    @test keys(reinfo2) == (:subj, :item)
+    tbl_all = ranefinfotable(reinfo2)
+    @test keys(tbl_all) == (:group, :name, :level, :cmode, :cstddev)
+    @test length(tbl_all.cmode) ==
+          length(ranefinfotable(reinfo2.subj).name) +
+          length(ranefinfotable(reinfo2.item).name)
+    @test all(==(:subj), tbl_all.group[1:length(ranefinfotable(reinfo2.subj).name)])
+end
+
+@testset "shrinkageinfo" begin
+    sinfo = shrinkageinfo(m1_speed)
+    @test isone(length(sinfo))
+    @test keys(sinfo) == (:subj,)
+    si1 = only(sinfo)
+    @test isa(si1, ShrinkageInfo)
+    @test si1.cnames == ["(Intercept)", "days"]
+    @test first(si1.levels) == "S308"
+    @test size(si1.λ) == (2, 2)
+    @test size(si1.blups) == size(si1.blimps) == (length(si1.levels), length(si1.cnames))
+
+    si2 = shrinkageinfo(m1_speed, :subj)
+    @test si2.cnames == si1.cnames
+    @test si2.blups == si1.blups
+    @test si2.blimps == si1.blimps
+    @test si2.λ == si1.λ
+
+    tbl = shrinkageinfotable(si1)
+    @test keys(tbl) == (:name, :level, :cmode, :rmode)
+    @test length(tbl.cmode) == length(si1.cnames) * length(si1.levels)
+
+    tbl2 = shrinkageinfotable(m1_speed, :subj)
+    @test tbl2 == tbl
+
+    sinfo2 = shrinkageinfo(m2)
+    @test keys(sinfo2) == (:subj, :item)
+    tbl_all = shrinkageinfotable(sinfo2)
+    @test keys(tbl_all) == (:group, :name, :level, :cmode, :rmode)
+    @test length(tbl_all.cmode) ==
+          length(shrinkageinfotable(sinfo2.subj).name) +
+          length(shrinkageinfotable(sinfo2.item).name)
 end

@@ -10,6 +10,17 @@ f = caterpillar(m2, :item)
 f = caterpillar(m2, :subj; cols=[:("load: yes"), :("prec: maintain")], orderby=2)
 @test save(joinpath(OUTDIR, "cat_kb07_subj_ordered_cols.png"), f)
 
+f = caterpillar(m2, :subj; cols=[:("load: yes"), :("prec: maintain")],
+                orderby=:("prec: maintain"))
+@test save(joinpath(OUTDIR, "cat_kb07_subj_ordered_cols_orderby_name.png"), f)
+
+let re = ranefinfo(m2, :subj)
+    cols = [:("load: yes"), :("prec: maintain")]
+    f_idx = caterpillar!(Figure(), re; cols, orderby=2)
+    f_name = caterpillar!(Figure(), re; cols, orderby=:("prec: maintain"))
+    @test f_idx.content[1].yticks[] == f_name.content[1].yticks[]
+end
+
 @test_throws ArgumentError caterpillar(m2, :subj; cols=[:("load: no")])
 
 f = caterpillar(g1)
