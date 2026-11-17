@@ -1,6 +1,6 @@
 name = "MixedModelsMakie"
 uuid = "b12ae82c-6730-437f-aff9-d2c38332a376"
-version = "0.4.21"
+version = "0.4.22"
 authors = ["Phillip Alday <me@phillipalday.com>", "Douglas Bates <dmbates@gmail.com>", "contributors"]
 
 [deps]
@@ -24,7 +24,7 @@ BSplineKit = "0.15, 0.16, 0.17, 0.18, 0.19"
 CairoMakie = "0.11, 0.12, 0.13, 0.14, 0.15"
 DataFrames = "1"
 Distributions = "0.25"
-DocStringExtensions = "0.9.5"
+DocStringExtensions = "0.9.5, 0.10"
 KernelDensity = "0.6.3"
 LinearAlgebra = "1"
 Makie = "0.20, 0.21, 0.22, 0.23, 0.24"
@@ -52,6 +52,3 @@ TestSetExtensions = "98d24dd4-01ad-11ea-1b02-c9a08f80db04"
 
 [targets]
 test = ["Aqua", "Test", "TestSetExtensions", "CairoMakie", "Random", "Statistics", "Suppressor"]
-
-# [workspace]
-# projects = ["docs"]
